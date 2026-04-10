@@ -36,7 +36,7 @@ class DashboardScreen extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: const [
                                   Text(
-                                    'John Doe',
+                                    'Mr Farazi',
                                     style: TextStyle(
                                       color: Color(0xFF4DD0E1), // Teal
                                       fontSize: 16,
@@ -80,9 +80,9 @@ class DashboardScreen extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          _buildCategoryIcon(Icons.air, 'Lungs'),
-                          _buildCategoryIcon(Icons.pregnant_woman, 'Gynecology'),
-                          _buildCategoryIcon(Icons.coronavirus_outlined, 'Dentistry'), // Using placeholder icons
+                          _buildCategoryIcon(Icons.air, 'Pneumonia'),
+                          _buildCategoryIcon(Icons.pregnant_woman, 'Skin'),
+                          _buildCategoryIcon(Icons.coronavirus_outlined, 'Emotion'), // Using placeholder icons
                         ],
                       ),
                       const SizedBox(height: 30),
@@ -118,7 +118,7 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   const Center(
                     child: Text(
-                      'Available Doctors',
+                      'Near Hospital',
                       style: TextStyle(
                         color: Color(0xFF033A6B), // Deep Blue
                         fontSize: 24,
@@ -130,13 +130,13 @@ class DashboardScreen extends StatelessWidget {
 
                   // Doctor Cards
                   _buildDoctorCard(
-                    name: 'Dr. Mira',
+                    name: 'Dr. Imon',
                     specialty: 'Specialist',
                     icon: Icons.person_3,
                   ),
                   const SizedBox(height: 16),
                   _buildDoctorCard(
-                    name: 'Dr. Sam',
+                    name: 'Dr. Farazi',
                     specialty: 'Specialist',
                     icon: Icons.person,
                   ),
