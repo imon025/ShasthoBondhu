@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class NearbyHospitalsScreen extends StatefulWidget {
-  const NearbyHospitalsScreen({Key? key}) : super(key: key);
+  const NearbyHospitalsScreen({super.key});
 
   @override
   State<NearbyHospitalsScreen> createState() => _NearbyHospitalsScreenState();
@@ -58,8 +58,8 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> {
           if (elementLat != null && elementLon != null) {
             markers.add(
               Marker(
-                width: 40.0,
-                height: 40.0,
+                width: 60,
+                height: 60,
                 point: LatLng(elementLat, elementLon),
                 child: GestureDetector(
                   onTap: () {
@@ -67,7 +67,7 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> {
                       SnackBar(content: Text(name)),
                     );
                   },
-                  child: const Icon(Icons.local_hospital, color: Colors.red, size: 40),
+                  child: const _CoolHospitalMarker(),
                 ),
               ),
             );
@@ -110,8 +110,11 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> {
 
     try {
       Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 5));
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 5),
+        ),
+      );
       if (mounted) {
         setState(() {
           _currentLocation = LatLng(position.latitude, position.longitude);
@@ -126,17 +129,20 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
           'Nearby Hospitals',
           style: TextStyle(color: Colors.white),
         ),
-        backgroundColor: const Color(0xFF033A6B),
+        backgroundColor: theme.primaryColor,
         centerTitle: true,
       ),
       body: _isLoading || _currentLocation == null
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
           : FlutterMap(
               mapController: _mapController,
               options: MapOptions(
@@ -163,6 +169,86 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> {
                 ),
               ],
             ),
+    );
+  }
+}
+
+class _CoolHospitalMarker extends StatefulWidget {
+  const _CoolHospitalMarker();
+
+  @override
+  State<_CoolHospitalMarker> createState() => _CoolHospitalMarkerState();
+}
+
+class _CoolHospitalMarkerState extends State<_CoolHospitalMarker>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            // Ripple effect
+            Container(
+              width: 30 + (30 * _controller.value),
+              height: 30 + (30 * _controller.value),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.red.withValues(alpha: 0.4 * (1 - _controller.value)),
+              ),
+            ),
+            // Outer ring
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+            ),
+            // Inner medical icon
+            Container(
+              width: 26,
+              height: 26,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.red,
+              ),
+              child: const Icon(
+                Icons.add,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

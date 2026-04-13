@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 import '../widgets/onboarding_page.dart';
 
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({Key? key}) : super(key: key);
+  const OnboardingScreen({super.key});
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -70,9 +71,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     Color currentColor = _onboardingData[_currentPage]['color'];
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
+    return Theme(
+      data: AppTheme.lightTheme,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
         children: [
           // The PageView
           PageView.builder(
@@ -145,6 +148,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -155,7 +159,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       height: 8,
       width: 8,
       decoration: BoxDecoration(
-        color: _currentPage == index ? Colors.white : Colors.white.withOpacity(0.5),
+        color: _currentPage == index ? Colors.white : Colors.white.withValues(alpha: 0.5),
         shape: BoxShape.circle,
       ),
     );

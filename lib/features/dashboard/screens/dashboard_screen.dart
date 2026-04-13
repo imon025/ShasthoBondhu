@@ -4,11 +4,12 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../../../main.dart'; // Import for themeNotifier
 import '../../profile/screens/profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final VoidCallback? onNavigateToNearby;
-  const DashboardScreen({Key? key, this.onNavigateToNearby}) : super(key: key);
+  const DashboardScreen({super.key, this.onNavigateToNearby});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -50,8 +51,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 5));
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 5),
+        ),
+      );
       if (mounted) {
         setState(() {
           _currentLocation = LatLng(position.latitude, position.longitude);
@@ -93,10 +97,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (elementLat != null && elementLon != null) {
             markers.add(
               Marker(
-                width: 40.0,
-                height: 40.0,
+                width: 60,
+                height: 60,
                 point: LatLng(elementLat, elementLon),
-                child: const Icon(Icons.local_hospital, color: Colors.red, size: 40),
+                child: const _CoolHospitalMarker(),
               ),
             );
           }
@@ -114,31 +118,74 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        child: Column(
           children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(color: Color(0xFF033A6B)),
-              child: Text('Menu', style: TextStyle(color: Colors.white, fontSize: 24)),
+            DrawerHeader(
+              decoration: BoxDecoration(color: theme.primaryColor),
+              child: Stack(
+                children: [
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      CircleAvatar(
+                        radius: 30,
+                        backgroundColor: Colors.white,
+                        child: Icon(Icons.person, color: theme.primaryColor, size: 40),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text('Menu', style: TextStyle(color: Colors.white, fontSize: 24)),
+                    ],
+                  ),
+                ],
+              ),
             ),
             ListTile(
-              leading: const Icon(Icons.home),
-              title: const Text('Home'),
+              leading: Icon(Icons.home, color: theme.iconTheme.color),
+              title: Text('Home', style: theme.textTheme.bodyLarge),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.settings),
-              title: const Text('Settings'),
+              leading: Icon(Icons.settings, color: theme.iconTheme.color),
+              title: Text('Settings', style: theme.textTheme.bodyLarge),
               onTap: () => Navigator.pop(context),
             ),
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: themeNotifier,
+              builder: (context, currentMode, child) {
+                final isDarkMode = currentMode == ThemeMode.dark || 
+                    (currentMode == ThemeMode.system && isDark);
+                return SwitchListTile(
+                  title: Text('Dark Mode', style: theme.textTheme.bodyLarge),
+                  secondary: Icon(isDarkMode ? Icons.dark_mode : Icons.light_mode, color: theme.iconTheme.color),
+                  value: isDarkMode,
+                  onChanged: (bool value) {
+                    themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
+                  },
+                );
+              },
+            ),
+            const Spacer(),
             ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Logout'),
+              leading: Icon(Icons.logout, color: theme.iconTheme.color),
+              title: Text('Logout', style: theme.textTheme.bodyLarge),
               onTap: () => Navigator.pop(context),
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -147,9 +194,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             // Top Section (Deep Blue)
             Container(
-              decoration: const BoxDecoration(
-                color: Color(0xFF033A6B), // Deep blue from image 2
-                borderRadius: BorderRadius.only(
+              decoration: BoxDecoration(
+                color: theme.primaryColor,
+                borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(40),
                   bottomRight: Radius.circular(40),
                 ),
@@ -176,16 +223,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             children: [
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
-                                children: const [
+                                children: [
                                   Text(
                                     'Mr Farazi',
                                     style: TextStyle(
-                                      color: Color(0xFF4DD0E1), // Teal
+                                      color: theme.colorScheme.secondary, // Teal
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  Text(
+                                  const Text(
                                     'Edit profile',
                                     style: TextStyle(
                                       color: Colors.white70,
@@ -202,10 +249,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     MaterialPageRoute(builder: (context) => const ProfileScreen()),
                                   );
                                 },
-                                child: const CircleAvatar(
+                                child: CircleAvatar(
                                   radius: 24,
                                   backgroundColor: Colors.white,
-                                  child: Icon(Icons.person, color: Color(0xFF033A6B), size: 30),
+                                  child: Icon(Icons.person, color: theme.primaryColor, size: 30),
                                 ),
                               ),
                             ],
@@ -240,15 +287,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: theme.colorScheme.surface,
                           borderRadius: BorderRadius.circular(30),
                         ),
-                        child: const TextField(
+                        child: TextField(
+                          style: TextStyle(color: theme.textTheme.bodyLarge?.color),
                           decoration: InputDecoration(
                             hintText: 'Search here',
-                            hintStyle: TextStyle(color: Colors.grey),
+                            hintStyle: const TextStyle(color: Colors.grey),
                             border: InputBorder.none,
-                            suffixIcon: Icon(Icons.search, color: Color(0xFF033A6B), size: 28),
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            suffixIcon: Icon(Icons.search, color: theme.iconTheme.color, size: 28),
                           ),
                         ),
                       ),
@@ -265,11 +315,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Center(
+                  Center(
                     child: Text(
                       'Near Hospital',
                       style: TextStyle(
-                        color: Color(0xFF033A6B), // Deep Blue
+                        color: theme.textTheme.bodyLarge?.color,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
@@ -285,7 +335,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       width: double.infinity,
                       child: _currentLocation == null
                         ? Container(
-                            color: Colors.grey[200],
+                            color: theme.colorScheme.surface,
                             child: const Center(
                               child: CircularProgressIndicator(),
                             ),
@@ -334,7 +384,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         child: Text(
                           'Show All >',
                           style: TextStyle(
-                            color: const Color(0xFF4DD0E1), // Teal
+                            color: theme.colorScheme.secondary,
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
@@ -371,5 +421,84 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ],
     );
   }
+}
 
+class _CoolHospitalMarker extends StatefulWidget {
+  const _CoolHospitalMarker();
+
+  @override
+  State<_CoolHospitalMarker> createState() => _CoolHospitalMarkerState();
+}
+
+class _CoolHospitalMarkerState extends State<_CoolHospitalMarker>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            // Ripple effect
+            Container(
+              width: 30 + (30 * _controller.value),
+              height: 30 + (30 * _controller.value),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.red.withValues(alpha: 0.4 * (1 - _controller.value)),
+              ),
+            ),
+            // Outer ring
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+            ),
+            // Inner medical icon
+            Container(
+              width: 26,
+              height: 26,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.red,
+              ),
+              child: const Icon(
+                Icons.add,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }

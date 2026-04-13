@@ -1,0 +1,46 @@
+Resolving dependencies...
+Downloading packages...
+  characters 1.4.0 (1.4.1 available)
+  matcher 0.12.17 (0.12.19 available)
+  material_color_utilities 0.11.1 (0.13.0 available)
+  meta 1.17.0 (1.18.2 available)
+  mgrs_dart 2.0.0 (3.0.0 available)
+  package_info_plus 9.0.1 (10.0.0 available)
+  package_info_plus_platform_interface 3.2.1 (4.0.0 available)
+  path_provider_foundation 2.5.1 (2.6.0 available)
+  proj4dart 2.1.0 (3.0.0 available)
+  test_api 0.7.7 (0.7.11 available)
+  unicode 0.3.1 (1.1.9 available)
+  vector_math 2.2.0 (2.3.0 available)
+  win32 5.15.0 (6.0.1 available)
+Got dependencies!
+13 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Analyzing shasthobondhu...                                      
+
+   info • Parameter 'key' could be a super parameter • lib/features/auth/screens/forgot_password_screen.dart:6:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/features/auth/screens/login_screen.dart:10:9 • use_super_parameters
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/screens/login_screen.dart:102:59 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/screens/login_screen.dart:149:53 • deprecated_member_use
+  error • Expected to find ')' • lib/features/auth/screens/login_screen.dart:230:6 • expected_token
+warning • Unused import: '../../dashboard/screens/dashboard_screen.dart' • lib/features/auth/screens/signup_screen.dart:4:8 • unused_import
+   info • Parameter 'key' could be a super parameter • lib/features/auth/screens/signup_screen.dart:8:9 • use_super_parameters
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/screens/signup_screen.dart:202:53 • deprecated_member_use
+  error • Expected to find ')' • lib/features/auth/screens/signup_screen.dart:299:6 • expected_token
+   info • Parameter 'key' could be a super parameter • lib/features/auth/widgets/custom_text_field.dart:12:9 • use_super_parameters
+   info • Parameter 'key' could be a super parameter • lib/features/dashboard/screens/dashboard_screen.dart:12:9 • use_super_parameters
+   info • 'desiredAccuracy' is deprecated and shouldn't be used. use settings parameter with AndroidSettings, AppleSettings, WebSettings, or LocationSettings • lib/features/dashboard/screens/dashboard_screen.dart:54:11 • deprecated_member_use
+   info • 'timeLimit' is deprecated and shouldn't be used. use settings parameter with AndroidSettings, AppleSettings, WebSettings, or LocationSettings • lib/features/dashboard/screens/dashboard_screen.dart:55:11 • deprecated_member_use
+   info • Parameter 'key' could be a super parameter • lib/features/dashboard/screens/main_screen.dart:6:9 • use_super_parameters
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/dashboard/screens/main_screen.dart:88:45 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/dashboard/screens/main_screen.dart:206:42 • deprecated_member_use
+   info • Parameter 'key' could be a super parameter • lib/features/dashboard/screens/nearby_hospitals_screen.dart:9:9 • use_super_parameters
+   info • 'desiredAccuracy' is deprecated and shouldn't be used. use settings parameter with AndroidSettings, AppleSettings, WebSettings, or LocationSettings • lib/features/dashboard/screens/nearby_hospitals_screen.dart:113:11 • deprecated_member_use
+   info • 'timeLimit' is deprecated and shouldn't be used. use settings parameter with AndroidSettings, AppleSettings, WebSettings, or LocationSettings • lib/features/dashboard/screens/nearby_hospitals_screen.dart:114:11 • deprecated_member_use
+   info • Parameter 'key' could be a super parameter • lib/features/onboarding/screens/onboarding_screen.dart:8:9 • use_super_parameters
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/screens/onboarding_screen.dart:162:68 • deprecated_member_use
+   info • Parameter 'key' could be a super parameter • lib/features/onboarding/widgets/onboarding_page.dart:9:9 • use_super_parameters
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/widgets/onboarding_page.dart:35:40 • deprecated_member_use
+   info • Parameter 'key' could be a super parameter • lib/features/profile/screens/profile_screen.dart:4:9 • use_super_parameters
+   info • Unnecessary use of multiple underscores • lib/main.dart:27:43 • unnecessary_underscores
+

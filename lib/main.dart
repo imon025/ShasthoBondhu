@@ -4,6 +4,8 @@ import 'core/theme/app_theme.dart';
 import 'core/constants/supabase_constants.dart';
 import 'features/onboarding/screens/onboarding_screen.dart';
 
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -20,11 +22,18 @@ class ShasthoBondhuApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ShasthoBondhu',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      home: const OnboardingScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (_, currentMode, child) {
+        return MaterialApp(
+          title: 'ShasthoBondhu',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: currentMode,
+          home: const OnboardingScreen(),
+        );
+      },
     );
   }
 }

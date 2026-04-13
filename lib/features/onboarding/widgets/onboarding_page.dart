@@ -7,12 +7,12 @@ class OnboardingPage extends StatelessWidget {
   final Color activeColor;
 
   const OnboardingPage({
-    Key? key,
-    required this.icon,
+    super.key,
     required this.title,
     required this.description,
+    required this.icon,
     required this.activeColor,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +32,7 @@ class OnboardingPage extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(40),
                   decoration: BoxDecoration(
-                    color: activeColor.withOpacity(0.1),
+                    color: activeColor.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
