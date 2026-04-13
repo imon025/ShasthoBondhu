@@ -1,8 +1,85 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../profile/screens/profile_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  LatLng? _currentLocation;
+  final MapController _mapController = MapController();
+  List<Marker> _hospitalMarkers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _determinePosition();
+  }
+
+  Future<void> _determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    void setFallbackLocation() {
+      if (!mounted) return;
+      setState(() {
+        _currentLocation = const LatLng(23.8103, 90.4125); // Dhaka Fallback
+        _generateMockHospitals();
+      });
+    }
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return setFallbackLocation();
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return setFallbackLocation();
+    }
+    
+    if (permission == LocationPermission.deniedForever) return setFallbackLocation();
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 5));
+      if (mounted) {
+        setState(() {
+          _currentLocation = LatLng(position.latitude, position.longitude);
+          _generateMockHospitals();
+        });
+      }
+    } catch (e) {
+      setFallbackLocation();
+    }
+  }
+
+  void _generateMockHospitals() {
+     if (_currentLocation == null) return;
+     _hospitalMarkers = [
+        Marker(
+          width: 40.0, height: 40.0,
+          point: LatLng(_currentLocation!.latitude + 0.005, _currentLocation!.longitude + 0.005),
+          child: const Icon(Icons.local_hospital, color: Colors.red, size: 40),
+        ),
+        Marker(
+          width: 40.0, height: 40.0,
+          point: LatLng(_currentLocation!.latitude - 0.005, _currentLocation!.longitude - 0.005),
+          child: const Icon(Icons.local_hospital, color: Colors.red, size: 40),
+        ),
+        Marker(
+          width: 40.0, height: 40.0,
+          point: LatLng(_currentLocation!.latitude + 0.008, _currentLocation!.longitude - 0.002),
+          child: const Icon(Icons.local_hospital, color: Colors.red, size: 40),
+        ),
+     ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -169,17 +246,46 @@ class DashboardScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
 
-                  // Hospital Cards
-                  _buildHospitalCard(
-                    name: 'City Central Hospital',
-                    details: 'General Hospital • 2.5 km away',
-                    icon: Icons.local_hospital,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildHospitalCard(
-                    name: 'Green View Clinic',
-                    details: 'Specialized Clinic • 4.1 km away',
-                    icon: Icons.medical_services,
+                  // Map Photo
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: SizedBox(
+                      height: 300,
+                      width: double.infinity,
+                      child: _currentLocation == null
+                        ? Container(
+                            color: Colors.grey[200],
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        : FlutterMap(
+                            mapController: _mapController,
+                            options: MapOptions(
+                              initialCenter: _currentLocation!,
+                              initialZoom: 14.0,
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                userAgentPackageName: 'com.example.sashthobondhu',
+                              ),
+                              MarkerLayer(
+                                markers: [
+                                  // User Location
+                                  Marker(
+                                    point: _currentLocation!,
+                                    width: 40,
+                                    height: 40,
+                                    child: const Icon(Icons.location_on, color: Colors.blue, size: 40),
+                                  ),
+                                  // Hospitals
+                                  ..._hospitalMarkers,
+                                ],
+                              ),
+                            ],
+                          ),
+                    ),
                   ),
                   const SizedBox(height: 16),
 
@@ -225,72 +331,4 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHospitalCard({required String name, required String details, required IconData icon}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF75E6DA), // Light teal background
-        borderRadius: BorderRadius.circular(20),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          // Avatar
-          Container(
-            width: 80,
-            height: 80,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 40, color: const Color(0xFF033A6B)),
-          ),
-          const SizedBox(width: 16),
-
-          // Details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: Color(0xFF033A6B),
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  details,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 10,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-
-          // Next Button
-          const Align(
-            alignment: Alignment.bottomRight,
-            child: CircleAvatar(
-              radius: 12,
-              backgroundColor: Colors.white,
-              child: Icon(Icons.arrow_forward_ios, size: 14, color: Color(0xFF75E6DA)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
