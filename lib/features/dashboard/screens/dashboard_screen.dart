@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../../profile/screens/profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({Key? key}) : super(key: key);
+  final VoidCallback? onNavigateToNearby;
+  const DashboardScreen({Key? key, this.onNavigateToNearby}) : super(key: key);
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -30,7 +33,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
       setState(() {
         _currentLocation = const LatLng(23.8103, 90.4125); // Dhaka Fallback
-        _generateMockHospitals();
+        _fetchNearbyHospitals();
       });
     }
 
@@ -52,7 +55,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (mounted) {
         setState(() {
           _currentLocation = LatLng(position.latitude, position.longitude);
-          _generateMockHospitals();
+          _fetchNearbyHospitals();
         });
       }
     } catch (e) {
@@ -60,25 +63,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _generateMockHospitals() {
-     if (_currentLocation == null) return;
-     _hospitalMarkers = [
-        Marker(
-          width: 40.0, height: 40.0,
-          point: LatLng(_currentLocation!.latitude + 0.005, _currentLocation!.longitude + 0.005),
-          child: const Icon(Icons.local_hospital, color: Colors.red, size: 40),
-        ),
-        Marker(
-          width: 40.0, height: 40.0,
-          point: LatLng(_currentLocation!.latitude - 0.005, _currentLocation!.longitude - 0.005),
-          child: const Icon(Icons.local_hospital, color: Colors.red, size: 40),
-        ),
-        Marker(
-          width: 40.0, height: 40.0,
-          point: LatLng(_currentLocation!.latitude + 0.008, _currentLocation!.longitude - 0.002),
-          child: const Icon(Icons.local_hospital, color: Colors.red, size: 40),
-        ),
-     ];
+  Future<void> _fetchNearbyHospitals() async {
+    if (_currentLocation == null) return;
+    final lat = _currentLocation!.latitude;
+    final lon = _currentLocation!.longitude;
+
+    final query = '''
+      [out:json];
+      (
+        node["amenity"="clinic"](around:5000,$lat,$lon);
+        node["amenity"="hospital"](around:5000,$lat,$lon);
+      );
+      out;
+    ''';
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://overpass-api.de/api/interpreter'),
+        body: query,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final elements = data['elements'] as List;
+        List<Marker> markers = [];
+        for (var element in elements) {
+          final elementLat = element['lat'];
+          final elementLon = element['lon'];
+          if (elementLat != null && elementLon != null) {
+            markers.add(
+              Marker(
+                width: 40.0,
+                height: 40.0,
+                point: LatLng(elementLat, elementLon),
+                child: const Icon(Icons.local_hospital, color: Colors.red, size: 40),
+              ),
+            );
+          }
+        }
+        if (mounted) {
+          setState(() {
+            _hospitalMarkers = markers;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch hospitals: $e');
+    }
   }
 
   @override
@@ -292,12 +323,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   // Show All Link
                   Align(
                     alignment: Alignment.centerRight,
-                    child: Text(
-                      'Show All >',
-                      style: TextStyle(
-                        color: const Color(0xFF4DD0E1), // Teal
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                    child: InkWell(
+                      onTap: () {
+                        if (widget.onNavigateToNearby != null) {
+                          widget.onNavigateToNearby!();
+                        }
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text(
+                          'Show All >',
+                          style: TextStyle(
+                            color: const Color(0xFF4DD0E1), // Teal
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
                   ),

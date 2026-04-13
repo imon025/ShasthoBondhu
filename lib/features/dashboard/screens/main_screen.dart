@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dashboard_screen.dart';
 import '../../profile/screens/profile_screen.dart';
+import 'nearby_hospitals_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -12,11 +13,17 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const DashboardScreen(),
+  late final List<Widget> _screens = [
+    DashboardScreen(
+      onNavigateToNearby: () {
+        setState(() {
+          _currentIndex = 3;
+        });
+      },
+    ),
     const Center(child: Text('Detect Screen (Coming Soon)')),
     const Center(child: Text('Health Tracking (Coming Soon)')),
-    const Center(child: Text('Nearby Hospitals Map/List (Coming Soon)')),
+    const NearbyHospitalsScreen(),
     const ProfileScreen(),
   ];
 
