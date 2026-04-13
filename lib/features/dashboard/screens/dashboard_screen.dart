@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../profile/screens/profile_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -7,6 +8,32 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(color: Color(0xFF033A6B)),
+              child: Text('Menu', style: TextStyle(color: Colors.white, fontSize: 24)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.home),
+              title: const Text('Home'),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Settings'),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Logout'),
+              onTap: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -29,7 +56,14 @@ class DashboardScreen extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Icon(Icons.menu, color: Colors.white, size: 32),
+                          Builder(
+                            builder: (context) => IconButton(
+                              padding: EdgeInsets.zero,
+                              alignment: Alignment.centerLeft,
+                              icon: const Icon(Icons.menu, color: Colors.white, size: 32),
+                              onPressed: () => Scaffold.of(context).openDrawer(),
+                            ),
+                          ),
                           Row(
                             children: [
                               Column(
@@ -53,11 +87,18 @@ class DashboardScreen extends StatelessWidget {
                                 ],
                               ),
                               const SizedBox(width: 12),
-                              const CircleAvatar(
-                                radius: 24,
-                                backgroundColor: Colors.white,
-                                // Use a placeholder icon for now
-                                child: Icon(Icons.person, color: Color(0xFF033A6B), size: 30),
+                              InkWell(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                                  );
+                                },
+                                child: const CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: Colors.white,
+                                  child: Icon(Icons.person, color: Color(0xFF033A6B), size: 30),
+                                ),
                               ),
                             ],
                           ),
@@ -80,9 +121,9 @@ class DashboardScreen extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          _buildCategoryIcon(Icons.air, 'Pneumonia'),
-                          _buildCategoryIcon(Icons.pregnant_woman, 'Skin'),
-                          _buildCategoryIcon(Icons.coronavirus_outlined, 'Emotion'), // Using placeholder icons
+                          _buildCategoryIcon(Icons.health_and_safety, 'Pneumonia'),
+                          _buildCategoryIcon(Icons.face_retouching_natural, 'Skin'),
+                          _buildCategoryIcon(Icons.mood, 'Emotion'),
                         ],
                       ),
                       const SizedBox(height: 30),
@@ -128,17 +169,17 @@ class DashboardScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
 
-                  // Doctor Cards
-                  _buildDoctorCard(
-                    name: 'Dr. Imon',
-                    specialty: 'Specialist',
-                    icon: Icons.person_3,
+                  // Hospital Cards
+                  _buildHospitalCard(
+                    name: 'City Central Hospital',
+                    details: 'General Hospital • 2.5 km away',
+                    icon: Icons.local_hospital,
                   ),
                   const SizedBox(height: 16),
-                  _buildDoctorCard(
-                    name: 'Dr. Farazi',
-                    specialty: 'Specialist',
-                    icon: Icons.person,
+                  _buildHospitalCard(
+                    name: 'Green View Clinic',
+                    details: 'Specialized Clinic • 4.1 km away',
+                    icon: Icons.medical_services,
                   ),
                   const SizedBox(height: 16),
 
@@ -184,7 +225,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDoctorCard({required String name, required String specialty, required IconData icon}) {
+  Widget _buildHospitalCard({required String name, required String details, required IconData icon}) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF75E6DA), // Light teal background
@@ -201,7 +242,7 @@ class DashboardScreen extends StatelessWidget {
               color: Colors.white,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 50, color: const Color(0xFF033A6B)),
+            child: Icon(icon, size: 40, color: const Color(0xFF033A6B)),
           ),
           const SizedBox(width: 16),
 
@@ -214,15 +255,15 @@ class DashboardScreen extends StatelessWidget {
                   name,
                   style: const TextStyle(
                     color: Color(0xFF033A6B),
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  specialty,
+                  details,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 16,
+                    fontSize: 14,
                   ),
                 ),
                 const SizedBox(height: 8),

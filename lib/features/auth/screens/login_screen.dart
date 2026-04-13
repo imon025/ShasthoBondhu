@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 import '../widgets/custom_text_field.dart';
-import '../../dashboard/screens/dashboard_screen.dart';
+import '../../dashboard/screens/main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -73,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         );
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const DashboardScreen()),
+          MaterialPageRoute(builder: (context) => const MainScreen()),
         );
       }
     } on AuthException catch (e) {
