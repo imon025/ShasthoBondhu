@@ -92,70 +92,55 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               );
             },
           ),
-          
-          // Skip Button
+          // Bottom Controls Bar
           Positioned(
-            top: 50,
-            right: 20,
-            child: TextButton(
-              onPressed: _completeOnboarding,
-              child: Text(
-                'SKIP',
-                style: TextStyle(
-                  color: Colors.white, // Over the colored circle
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              color: currentColor,
+              child: SafeArea(
+                top: false,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Skip Button
+                    TextButton(
+                      onPressed: _completeOnboarding,
+                      child: const Text(
+                        'Skip',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    // Indicators
+                    Row(
+                      children: List.generate(
+                        _onboardingData.length,
+                        (index) => buildDot(index: index),
+                      ),
+                    ),
+                    // Next / Log In Button
+                    IconButton(
+                      onPressed: () {
+                        if (_currentPage < _onboardingData.length - 1) {
+                          _pageController.nextPage(
+                            duration: const Duration(milliseconds: 500),
+                            curve: Curves.easeInOutCubic,
+                          );
+                        } else {
+                          _completeOnboarding();
+                        }
+                      },
+                      icon: const Icon(Icons.arrow_forward, color: Colors.white),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
-
-          // Bottom Controls (Dots & Button)
-          Positioned(
-            bottom: 40,
-            left: 30,
-            right: 30,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Indicators
-                Row(
-                  children: List.generate(
-                    _onboardingData.length,
-                    (index) => buildDot(index: index, activeColor: currentColor),
-                  ),
-                ),
-                // Next / Log In Button (Pill shaped, matches Photo 1)
-                ElevatedButton(
-                  onPressed: () {
-                    if (_currentPage < _onboardingData.length - 1) {
-                      _pageController.nextPage(
-                        duration: const Duration(milliseconds: 500),
-                        curve: Curves.easeInOutCubic,
-                      );
-                    } else {
-                      _completeOnboarding();
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: currentColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    elevation: 10,
-                    shadowColor: currentColor.withOpacity(0.5),
-                  ),
-                  child: Text(
-                    _currentPage == _onboardingData.length - 1 ? 'LOG IN' : 'NEXT',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900, 
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                ),
-              ],
             ),
           ),
         ],
@@ -163,15 +148,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget buildDot({required int index, required Color activeColor}) {
+  Widget buildDot({required int index}) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.only(right: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
       height: 8,
-      width: _currentPage == index ? 24 : 8,
+      width: 8,
       decoration: BoxDecoration(
-        color: _currentPage == index ? activeColor : activeColor.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(4),
+        color: _currentPage == index ? Colors.white : Colors.white.withOpacity(0.5),
+        shape: BoxShape.circle,
       ),
     );
   }
