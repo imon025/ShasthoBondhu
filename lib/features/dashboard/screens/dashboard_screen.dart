@@ -4,8 +4,10 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:ui' as ui;
 import '../../../../main.dart'; // Import for themeNotifier
 import '../../profile/screens/profile_screen.dart';
+import '../../pneumonia/screens/pneumonia_detection_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final VoidCallback? onNavigateToNearby;
@@ -100,7 +102,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 width: 60,
                 height: 60,
                 point: LatLng(elementLat, elementLon),
-                child: const _CoolHospitalMarker(),
+                alignment: Alignment.topCenter,
+                child: const _MedicalPinMarker(),
               ),
             );
           }
@@ -276,7 +279,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          _buildCategoryIcon(Icons.health_and_safety, 'Pneumonia'),
+                          _buildCategoryIcon(
+                            Icons.health_and_safety, 
+                            'Pneumonia',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => const PneumoniaDetectionScreen()),
+                              );
+                            },
+                          ),
                           _buildCategoryIcon(Icons.face_retouching_natural, 'Skin'),
                           _buildCategoryIcon(Icons.mood, 'Emotion'),
                         ],
@@ -401,36 +413,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildCategoryIcon(IconData icon, String label) {
-    return Column(
-      children: [
-        Container(
-          width: 70,
-          height: 70,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
+  Widget _buildCategoryIcon(IconData icon, String label, {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(40),
+      child: Column(
+        children: [
+          Container(
+            width: 70,
+            height: 70,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: const Color(0xFFFFB4A2), size: 36), // Pinkish icon color
           ),
-          child: Icon(icon, color: const Color(0xFFFFB4A2), size: 36), // Pinkish icon color
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-        ),
-      ],
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _CoolHospitalMarker extends StatefulWidget {
-  const _CoolHospitalMarker();
+class _MedicalPinMarker extends StatefulWidget {
+  const _MedicalPinMarker();
 
   @override
-  State<_CoolHospitalMarker> createState() => _CoolHospitalMarkerState();
+  State<_MedicalPinMarker> createState() => _MedicalPinMarkerState();
 }
 
-class _CoolHospitalMarkerState extends State<_CoolHospitalMarker>
+class _MedicalPinMarkerState extends State<_MedicalPinMarker>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
@@ -455,50 +471,76 @@ class _CoolHospitalMarkerState extends State<_CoolHospitalMarker>
       animation: _controller,
       builder: (context, child) {
         return Stack(
-          alignment: Alignment.center,
+          alignment: Alignment.bottomCenter,
           children: [
             // Ripple effect
-            Container(
-              width: 30 + (30 * _controller.value),
-              height: 30 + (30 * _controller.value),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.red.withValues(alpha: 0.4 * (1 - _controller.value)),
+            Positioned(
+              bottom: 20, // Centered on the pin head
+              child: Container(
+                width: 25 + (30 * _controller.value),
+                height: 25 + (30 * _controller.value),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.red.withValues(alpha: 0.4 * (1 - _controller.value)),
+                ),
               ),
             ),
-            // Outer ring
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 8,
-                    spreadRadius: 2,
+            // Pin Shape
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Head
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(color: Colors.red, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            // Inner medical icon
-            Container(
-              width: 26,
-              height: 26,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.red,
-              ),
-              child: const Icon(
-                Icons.add,
-                color: Colors.white,
-                size: 20,
-              ),
+                  child: const Center(
+                    child: Icon(Icons.add, color: Colors.red, size: 20),
+                  ),
+                ),
+                // Tip
+                CustomPaint(
+                  size: const Size(12, 10),
+                  painter: _PinTipPainter(color: Colors.red),
+                ),
+                const SizedBox(height: 10), // Offset to keep tip at center bottom of stack
+              ],
             ),
           ],
         );
       },
     );
   }
+}
+
+class _PinTipPainter extends CustomPainter {
+  final Color color;
+  _PinTipPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final ui.Path path = ui.Path();
+    path.moveTo(0, 0);
+    path.lineTo(size.width, 0);
+    path.lineTo(size.width / 2, size.height);
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

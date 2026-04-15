@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 class NearbyHospitalsScreen extends StatefulWidget {
   const NearbyHospitalsScreen({super.key});
@@ -61,13 +62,14 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> {
                 width: 60,
                 height: 60,
                 point: LatLng(elementLat, elementLon),
+                alignment: Alignment.topCenter, // The tip of the pin is at the bottom of the 60x60 area
                 child: GestureDetector(
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(name)),
                     );
                   },
-                  child: const _CoolHospitalMarker(),
+                  child: const _MedicalPinMarker(),
                 ),
               ),
             );
@@ -173,14 +175,14 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> {
   }
 }
 
-class _CoolHospitalMarker extends StatefulWidget {
-  const _CoolHospitalMarker();
+class _MedicalPinMarker extends StatefulWidget {
+  const _MedicalPinMarker();
 
   @override
-  State<_CoolHospitalMarker> createState() => _CoolHospitalMarkerState();
+  State<_MedicalPinMarker> createState() => _MedicalPinMarkerState();
 }
 
-class _CoolHospitalMarkerState extends State<_CoolHospitalMarker>
+class _MedicalPinMarkerState extends State<_MedicalPinMarker>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
@@ -205,50 +207,76 @@ class _CoolHospitalMarkerState extends State<_CoolHospitalMarker>
       animation: _controller,
       builder: (context, child) {
         return Stack(
-          alignment: Alignment.center,
+          alignment: Alignment.bottomCenter,
           children: [
             // Ripple effect
-            Container(
-              width: 30 + (30 * _controller.value),
-              height: 30 + (30 * _controller.value),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.red.withValues(alpha: 0.4 * (1 - _controller.value)),
+            Positioned(
+              bottom: 20, // Centered on the pin head
+              child: Container(
+                width: 25 + (30 * _controller.value),
+                height: 25 + (30 * _controller.value),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.red.withValues(alpha: 0.4 * (1 - _controller.value)),
+                ),
               ),
             ),
-            // Outer ring
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 8,
-                    spreadRadius: 2,
+            // Pin Shape
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Head
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(color: Colors.red, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            // Inner medical icon
-            Container(
-              width: 26,
-              height: 26,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.red,
-              ),
-              child: const Icon(
-                Icons.add,
-                color: Colors.white,
-                size: 20,
-              ),
+                  child: const Center(
+                    child: Icon(Icons.add, color: Colors.red, size: 20),
+                  ),
+                ),
+                // Tip
+                CustomPaint(
+                  size: const Size(12, 10),
+                  painter: _PinTipPainter(color: Colors.red),
+                ),
+                const SizedBox(height: 10), // Offset to keep tip at center bottom of stack
+              ],
             ),
           ],
         );
       },
     );
   }
+}
+
+class _PinTipPainter extends CustomPainter {
+  final Color color;
+  _PinTipPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final ui.Path path = ui.Path(); 
+    path.moveTo(0, 0);
+    path.lineTo(size.width, 0);
+    path.lineTo(size.width / 2, size.height);
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
