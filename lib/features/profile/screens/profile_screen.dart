@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../pneumonia/services/history_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -264,10 +265,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                     SizedBox(
-                      height: 200,
+                      height: 300,
                       child: TabBarView(
                         children: [
-                          // Health History Mock
+                          // Health History Mock (Keep as is for now)
                           ListView.builder(
                             itemCount: 3,
                             itemBuilder: (context, index) => ListTile(
@@ -276,14 +277,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               subtitle: Text('12 Oct 2026', style: theme.textTheme.bodyMedium),
                             ),
                           ),
-                          // Detect History Mock
-                          ListView.builder(
-                            itemCount: 2,
-                            itemBuilder: (context, index) => ListTile(
-                              leading: Icon(Icons.search, color: theme.primaryColor),
-                              title: Text('Pneumonia Scan #${index + 1}', style: theme.textTheme.bodyLarge),
-                              subtitle: Text('Negative - 05 Oct 2026', style: theme.textTheme.bodyMedium),
-                            ),
+                          // LIVE Detect History
+                          FutureBuilder<List<Map<String, dynamic>>>(
+                            future: HistoryService().fetchCloudHistory(),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator());
+                              }
+                              
+                              final data = snapshot.data ?? [];
+                              if (data.isEmpty) {
+                                return Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(20),
+                                    child: Text('No history found', style: TextStyle(color: isDark ? Colors.white70 : Colors.grey)),
+                                  ),
+                                );
+                              }
+
+                              return ListView.builder(
+                                itemCount: data.length,
+                                itemBuilder: (context, index) {
+                                  final item = data[index];
+                                  final label = item['label'] ?? 'Unknown';
+                                  final confidence = (item['confidence'] ?? 0.0) * 100;
+                                  final date = DateTime.parse(item['created_at']).toString().split(' ')[0];
+                                  final patient = item['patient_name'] ?? 'Self';
+
+                                  return ListTile(
+                                    leading: Icon(
+                                      label == 'PNEUMONIA' ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                                      color: label == 'PNEUMONIA' ? Colors.red : Colors.green,
+                                    ),
+                                    title: Text('$label ($patient)', style: theme.textTheme.bodyLarge),
+                                    subtitle: Text('${confidence.toStringAsFixed(1)}% Confidence • $date', style: theme.textTheme.bodyMedium),
+                                  );
+                                },
+                              );
+                            },
                           ),
                         ],
                       ),

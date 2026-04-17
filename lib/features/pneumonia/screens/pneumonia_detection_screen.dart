@@ -2,7 +2,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/pneumonia_service.dart';
+import '../services/history_service.dart';
 import '../../../core/theme/app_colors.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PneumoniaDetectionScreen extends StatefulWidget {
   const PneumoniaDetectionScreen({super.key});
@@ -14,9 +16,12 @@ class PneumoniaDetectionScreen extends StatefulWidget {
 class _PneumoniaDetectionScreenState extends State<PneumoniaDetectionScreen>
     with SingleTickerProviderStateMixin {
   final PneumoniaService _pneumoniaService = createPneumoniaService();
+  final HistoryService _historyService = HistoryService();
   final ImagePicker _picker = ImagePicker();
+  
   Uint8List? _imageBytes;
   bool _isLoading = false;
+  bool _showHeatmap = false;
   Map<String, dynamic>? _result;
   
   late AnimationController _scanController;
@@ -26,7 +31,6 @@ class _PneumoniaDetectionScreenState extends State<PneumoniaDetectionScreen>
     super.initState();
     _pneumoniaService.loadModel();
     
-    // Animation setup for scanning and pulse effects
     _scanController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -46,6 +50,7 @@ class _PneumoniaDetectionScreenState extends State<PneumoniaDetectionScreen>
       setState(() {
         _imageBytes = bytes;
         _result = null;
+        _showHeatmap = false;
       });
     }
   }
@@ -56,16 +61,14 @@ class _PneumoniaDetectionScreenState extends State<PneumoniaDetectionScreen>
     setState(() {
       _isLoading = true;
       _result = null;
+      _showHeatmap = false;
     });
 
-    // Start scanning/pulse animation immediately
     _scanController.repeat(reverse: true);
 
     try {
-      // 1. BREATHING GAP: Allow the UI to transition smoothly before heavy work starts
       await Future.delayed(const Duration(milliseconds: 300));
       
-      // Minimum duration for the "cool" animation feel
       final minDuration = Future.delayed(const Duration(seconds: 3));
       final prediction = _pneumoniaService.predict(_imageBytes!);
       
@@ -78,6 +81,16 @@ class _PneumoniaDetectionScreenState extends State<PneumoniaDetectionScreen>
           _isLoading = false;
           _scanController.stop();
         });
+
+        // Save to History
+        if (result['label'] != 'NOT AN X-RAY' && result['error'] == null) {
+          await _historyService.saveResult(PneumoniaHistoryItem(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            label: result['label'],
+            confidence: result['confidence'],
+            dateTime: DateTime.now(),
+          ));
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -90,19 +103,184 @@ class _PneumoniaDetectionScreenState extends State<PneumoniaDetectionScreen>
     }
   }
 
+  void _showHistory() async {
+    final history = await _historyService.getHistory();
+    if (!mounted) return;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Scan History', style: TextStyle(
+                  fontSize: 20, 
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87
+                )),
+                TextButton(
+                  onPressed: () {
+                    _historyService.clearHistory();
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Clear All', style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (history.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(40), 
+                  child: Text('No local history yet', style: TextStyle(color: isDark ? Colors.white70 : Colors.grey))
+                )
+              ),
+            Expanded(
+              child: ListView(
+                shrinkWrap: true,
+                children: history.map((item) => ListTile(
+                  leading: Icon(
+                    item.label == 'PNEUMONIA' ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                    color: item.label == 'PNEUMONIA' ? Colors.red : Colors.green,
+                  ),
+                  title: Text(item.label, style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                  subtitle: Text(
+                    '${(item.confidence * 100).toStringAsFixed(1)}% Confidence • ${item.dateTime.toString().split(' ')[0]}',
+                    style: TextStyle(color: isDark ? Colors.white60 : Colors.black54),
+                  ),
+                )).toList(),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showSaveDialog() async {
+    final theme = Theme.of(context);
+    final nameController = TextEditingController();
+    final ageController = TextEditingController();
+
+    // Try to auto-fill from profile (REMOVED per user request)
+    // We start with blank fields for clinical accuracy
+    
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save to Clinical Record'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: 'Patient Name', 
+                hintText: 'Enter name',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                filled: true,
+                fillColor: theme.colorScheme.surface,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: ageController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Age', 
+                hintText: 'Enter age',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                filled: true,
+                fillColor: theme.colorScheme.surface,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty || ageController.text.isEmpty) {
+                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+                 return;
+              }
+              
+              final age = int.tryParse(ageController.text);
+              if (age == null) return;
+
+              Navigator.pop(context);
+              setState(() => _isLoading = true);
+
+              try {
+                debugPrint('Attempting to save to Supabase...');
+                if (_result == null) throw Exception('No analysis result found to save');
+                
+                await _historyService.saveToCloud(
+                  patientName: nameController.text.trim(),
+                  patientAge: age,
+                  label: _result!['label'],
+                  confidence: _result!['confidence'] ?? 0.0,
+                );
+                
+                debugPrint('Supabase save successful!');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Successfully saved to profile!'), backgroundColor: Colors.green),
+                  );
+                }
+              } catch (e) {
+                debugPrint('Supabase save error: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to save: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              } finally {
+                if (mounted) setState(() => _isLoading = false);
+              }
+            },
+            child: const Text('Save Now'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isPneumonia = _result?['label'] == 'PNEUMONIA';
     final bool isNotXray = _result?['label'] == 'NOT AN X-RAY';
     final Color resultColor = isNotXray ? Colors.orange : (isPneumonia ? Colors.red : Colors.green);
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Pneumonia Detection', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: AppColors.textPrimary,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        elevation: 2,
+        foregroundColor: Theme.of(context).colorScheme.primary,
+        shadowColor: Colors.black.withOpacity(0.1),
+        actions: [
+          IconButton(
+            onPressed: _showHistory,
+            icon: const Icon(Icons.history_rounded),
+            tooltip: 'History',
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -127,12 +305,12 @@ class _PneumoniaDetectionScreenState extends State<PneumoniaDetectionScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'AI X-Ray Analysis',
+                              'Premium AI X-Ray Analysis',
                               style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              'Upload an X-ray report for instant detection.',
-                              style: TextStyle(color: Colors.white70, fontSize: 14),
+                              'Powered by Transfer Learning (MobileNetV2)',
+                              style: TextStyle(color: Colors.white70, fontSize: 12),
                             ),
                           ],
                         ),
@@ -142,56 +320,53 @@ class _PneumoniaDetectionScreenState extends State<PneumoniaDetectionScreen>
                 ),
                 const SizedBox(height: 30),
 
-                // Image Selection
-                GestureDetector(
-                  onTap: _isLoading ? null : () => _pickImage(ImageSource.gallery),
-                  child: Container(
-                    height: 300,
-                    width: double.infinity,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(25),
-                      border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.1), width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 15,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: _imageBytes == null
-                        ? Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryBlue.withValues(alpha: 0.05),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(Icons.cloud_upload_outlined, size: 48, color: AppColors.primaryBlue),
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Tap to upload Chest X-ray',
-                                style: TextStyle(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.w500),
-                              ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'Supports JPG, PNG',
-                                style: TextStyle(color: Colors.black26, fontSize: 12),
-                              ),
-                            ],
-                          )
-                        : ClipRRect(
-                            borderRadius: BorderRadius.circular(23),
-                            child: Image.memory(_imageBytes!, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+                // Image Selection & Heatmap Toggle
+                Stack(
+                  alignment: Alignment.topRight,
+                  children: [
+                    Container(
+                      height: 300,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDark ? Colors.black26 : Colors.black.withOpacity(0.05),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
                           ),
-                  ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(23),
+                        child: _imageBytes == null
+                            ? const Center(child: Text('Tap to upload Chest X-ray', style: TextStyle(color: Colors.grey)))
+                            : Stack(
+                                children: [
+                                  Image.memory(_imageBytes!, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+                                  if (_showHeatmap && _result?['heatmap'] != null)
+                                    Image.memory(_result!['heatmap'], fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+                                ],
+                              ),
+                      ),
+                    ),
+                    if (_result?['heatmap'] != null)
+                      Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: FloatingActionButton.small(
+                          onPressed: () => setState(() => _showHeatmap = !_showHeatmap),
+                          backgroundColor: _showHeatmap ? Colors.red : Colors.white,
+                          child: Icon(Icons.remove_red_eye, color: _showHeatmap ? Colors.white : Colors.red),
+                        ),
+                      ),
+                  ],
                 ),
+                if (_result?['heatmap'] != null)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                    child: Text('Toggle AI Heatmap to see regions of interest', style: TextStyle(fontSize: 10, color: Colors.grey, fontStyle: FontStyle.italic)),
+                  ),
                 const SizedBox(height: 24),
 
                 // Action Buttons
@@ -199,31 +374,69 @@ class _PneumoniaDetectionScreenState extends State<PneumoniaDetectionScreen>
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: _isLoading ? null : () => _pickImage(ImageSource.camera),
-                        icon: const Icon(Icons.camera_alt),
-                        label: const Text('Camera'),
+                        onPressed: _imageBytes == null ? null : () {
+                          setState(() {
+                            _imageBytes = null;
+                            _result = null;
+                            _showHeatmap = false;
+                          });
+                        },
+                        icon: const Icon(Icons.cancel_outlined),
+                        label: const Text('Cancel'),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Colors.white,
-                          foregroundColor: AppColors.primaryBlue,
+                          backgroundColor: Theme.of(context).brightness == Brightness.dark 
+                              ? Colors.white10 
+                              : Colors.grey[200],
+                          foregroundColor: Theme.of(context).brightness == Brightness.dark 
+                              ? Colors.white70 
+                              : Colors.black54,
                           elevation: 0,
-                          side: const BorderSide(color: AppColors.primaryBlue),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15), 
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: _isLoading ? null : () => _pickImage(ImageSource.gallery),
-                        icon: const Icon(Icons.photo_library),
-                        label: const Text('Gallery'),
+                        onPressed: _isLoading ? null : () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Select Source'),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ListTile(
+                                    leading: const Icon(Icons.camera_alt, color: AppColors.primaryBlue),
+                                    title: const Text('Camera'),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _pickImage(ImageSource.camera);
+                                    },
+                                  ),
+                                  ListTile(
+                                    leading: const Icon(Icons.photo_library, color: AppColors.primaryBlue),
+                                    title: const Text('Gallery'),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _pickImage(ImageSource.gallery);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.cloud_upload_outlined),
+                        label: const Text('Upload'),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Colors.white,
-                          foregroundColor: AppColors.primaryBlue,
-                          elevation: 0,
-                          side: const BorderSide(color: AppColors.primaryBlue),
+                          backgroundColor: AppColors.primaryBlue,
+                          foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                         ),
                       ),
@@ -240,16 +453,12 @@ class _PneumoniaDetectionScreenState extends State<PneumoniaDetectionScreen>
                     backgroundColor: AppColors.primaryBlue,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   ),
-                  child: const Text(
-                    'START DETECTION',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
+                  child: const Text('START CLINICAL DETECTION', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
                 ),
 
                 // Result Section
                 AnimatedSize(
                   duration: const Duration(milliseconds: 500),
-                  curve: Curves.fastOutSlowIn,
                   child: _result == null
                       ? const SizedBox.shrink()
                       : Column(
@@ -258,119 +467,49 @@ class _PneumoniaDetectionScreenState extends State<PneumoniaDetectionScreen>
                             Container(
                               padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
-                                color: resultColor.withValues(alpha: 0.1),
+                                color: resultColor.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(25),
-                                border: Border.all(
-                                  color: resultColor.withValues(alpha: 0.3),
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: resultColor.withValues(alpha: 0.05),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 10),
-                                  ),
-                                ],
+                                border: Border.all(color: resultColor.withOpacity(0.3)),
                               ),
                               child: Column(
                                 children: [
-                                  if (isNotXray) ...[
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.orange,
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.warning_amber_rounded, color: Colors.white, size: 14),
-                                          SizedBox(width: 4),
-                                          Text(
-                                            'INVALID INPUT',
-                                            style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                  ] else ...[
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primaryBlue,
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: const Text(
-                                        'AI VERIFIED',
-                                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                  ],
                                   Text(
-                                    'Analysis Result',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                      color: resultColor.withValues(alpha: 0.7),
-                                    ),
+                                    'Analysis Result: ${_result!["label"]}',
+                                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: resultColor),
                                   ),
-                                  const SizedBox(height: 8),
+                                  if (!isNotXray && _result!['confidence'] != null)
+                                    Text(
+                                      'Confidence: ${(_result!['confidence'] * 100).toStringAsFixed(1)}%',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold, 
+                                        color: isDark ? resultColor.withOpacity(0.9) : resultColor
+                                      ),
+                                    ),
+                                  const SizedBox(height: 16),
                                   Text(
-                                    _result!['label'] ?? 'Unknown',
+                                    isNotXray ? (_result!['warning'] ?? 'Invalid Image') : (isPneumonia ? 'Seek Medical Attention' : 'Healthy Lungs Detected'),
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: isNotXray ? 24 : 40,
-                                      fontWeight: FontWeight.w900,
-                                      color: resultColor,
-                                      letterSpacing: 1.2,
+                                      fontStyle: FontStyle.italic,
+                                      color: isDark ? Colors.white70 : Colors.black54,
                                     ),
-                                  ),
-                                  const Text(
-                                    '(Real-time AI Clinical Analysis)',
-                                    style: TextStyle(color: Colors.grey, fontSize: 10, fontStyle: FontStyle.italic),
-                                  ),
-                                  if (!isNotXray && _result!['confidence'] != null) ...[
-                                    const SizedBox(height: 16),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        color: resultColor.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(15),
-                                      ),
-                                      child: Text(
-                                        'Confidence: ${(_result!['confidence'] * 100).toStringAsFixed(1)}%',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: resultColor,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 24),
-                                  const Divider(),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.info_outline, color: resultColor, size: 20),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          isNotXray
-                                              ? (_result!['warning'] ?? 'Please upload a valid grayscale X-ray for analysis.')
-                                              : (_result!['label'] == 'PNEUMONIA'
-                                                  ? 'Recommendations: Please consult a doctor immediately and stay hydrated.'
-                                                  : 'Recommendations: Your lungs appear clear. Maintain healthy habits!'),
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: AppColors.textPrimary.withValues(alpha: 0.8),
-                                            fontStyle: FontStyle.italic,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
                                   ),
                                 ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _showSaveDialog,
+                                icon: const Icon(Icons.cloud_upload_outlined, color: Colors.white),
+                                label: const Text('SAVE TO CLINICAL HISTORY'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.teal,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                ),
                               ),
                             ),
                           ],
@@ -381,75 +520,17 @@ class _PneumoniaDetectionScreenState extends State<PneumoniaDetectionScreen>
             ),
           ),
           
-          // IMMERSIVE ANALYSIS INTERPAGE (Lab Mode)
           if (_isLoading)
-            RepaintBoundary(
-              child: FadeTransition(
-                opacity: _scanController, // Subtle shimmer effect using existing controller
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.95),
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ScaleTransition(
-                          scale: Tween(begin: 1.0, end: 1.2).animate(_scanController),
-                          child: Container(
-                            width: 150,
-                            height: 150,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.primaryBlue, width: 4),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primaryBlue.withValues(alpha: 0.4),
-                                  blurRadius: 40,
-                                  spreadRadius: 20,
-                                ),
-                              ],
-                            ),
-                            child: const Icon(Icons.psychology_outlined, color: Colors.white, size: 80),
-                          ),
-                        ),
-                        const SizedBox(height: 60),
-                        TweenAnimationBuilder<double>(
-                          tween: Tween(begin: 0.0, end: 1.0),
-                          duration: const Duration(seconds: 3),
-                          builder: (context, value, _) {
-                            return Column(
-                              children: [
-                                Text(
-                                  'AI CLINICAL SCANNER',
-                                  style: TextStyle(
-                                    color: AppColors.primaryBlue,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 8,
-                                    fontSize: 12,
-                                    shadows: [Shadow(color: AppColors.primaryBlue, blurRadius: 10 * value)],
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                SizedBox(
-                                  width: 200,
-                                  child: LinearProgressIndicator(
-                                    value: value,
-                                    backgroundColor: Colors.white12,
-                                    color: AppColors.primaryBlue,
-                                    minHeight: 2,
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'Decrypting pulmonary structures...',
-                          style: TextStyle(color: Colors.white54, fontSize: 14, letterSpacing: 1),
-                        ),
-                      ],
-                    ),
-                  ),
+            Container(
+              color: Colors.black.withOpacity(0.9),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CircularProgressIndicator(color: AppColors.primaryBlue),
+                    const SizedBox(height: 24),
+                    const Text('AI PULMONARY ANALYSIS...', style: TextStyle(color: Colors.white, letterSpacing: 2, fontWeight: FontWeight.bold)),
+                  ],
                 ),
               ),
             ),

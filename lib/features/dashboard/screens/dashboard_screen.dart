@@ -167,6 +167,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               title: Text('Settings', style: theme.textTheme.bodyLarge),
               onTap: () => Navigator.pop(context),
             ),
+            const Spacer(),
             ValueListenableBuilder<ThemeMode>(
               valueListenable: themeNotifier,
               builder: (context, currentMode, child) {
@@ -182,7 +183,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 );
               },
             ),
-            const Spacer(),
             ListTile(
               leading: Icon(Icons.logout, color: theme.iconTheme.color),
               title: Text('Logout', style: theme.textTheme.bodyLarge),
@@ -282,6 +282,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           _buildCategoryIcon(
                             Icons.health_and_safety, 
                             'Pneumonia',
+                            color: const Color(0xFFFF6B6B), // Soft Coral
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -289,28 +290,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               );
                             },
                           ),
-                          _buildCategoryIcon(Icons.face_retouching_natural, 'Skin'),
-                          _buildCategoryIcon(Icons.mood, 'Emotion'),
+                          _buildCategoryIcon(
+                            Icons.face_retouching_natural, 
+                            'Skin',
+                            color: const Color(0xFFFFD93D), // Soft Amber
+                          ),
+                          _buildCategoryIcon(
+                            Icons.mood, 
+                            'Emotion',
+                            color: const Color(0xFF6BCBFF), // Soft Azure
+                          ),
                         ],
                       ),
                       const SizedBox(height: 30),
 
                       // Search Bar
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.surface,
-                          borderRadius: BorderRadius.circular(30),
+                          color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.white,
+                          borderRadius: BorderRadius.circular(35),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 15,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                          border: isDark ? Border.all(color: Colors.white24) : null,
                         ),
                         child: TextField(
-                          style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black87,
+                            fontSize: 16,
+                          ),
                           decoration: InputDecoration(
-                            hintText: 'Search here',
-                            hintStyle: const TextStyle(color: Colors.grey),
+                            hintText: 'Search medical services...',
+                            hintStyle: TextStyle(
+                              color: isDark ? Colors.white54 : Colors.grey,
+                              fontSize: 15,
+                            ),
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
                             focusedBorder: InputBorder.none,
-                            suffixIcon: Icon(Icons.search, color: theme.iconTheme.color, size: 28),
+                            prefixIcon: Icon(
+                              Icons.search_rounded, 
+                              color: isDark ? theme.colorScheme.secondary : theme.primaryColor, 
+                              size: 26,
+                            ),
                           ),
                         ),
                       ),
@@ -413,7 +440,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildCategoryIcon(IconData icon, String label, {VoidCallback? onTap}) {
+  Widget _buildCategoryIcon(IconData icon, String label, {required Color color, VoidCallback? onTap}) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(40),
@@ -422,16 +449,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             width: 70,
             height: 70,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
             ),
-            child: Icon(icon, color: const Color(0xFFFFB4A2), size: 36), // Pinkish icon color
+            child: Icon(icon, color: color, size: 36),
           ),
           const SizedBox(height: 8),
           Text(
             label,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
+            style: const TextStyle(
+              color: Colors.white, 
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
