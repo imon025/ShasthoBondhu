@@ -1,3 +1,5 @@
+
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -18,18 +20,48 @@ _ImageProcessResult _processImageBackground(Uint8List imageBytes) {
     final imageData = img.decodeImage(imageBytes);
     if (imageData == null) return _ImageProcessResult(isLikelyXray: false, error: 'Invalid image');
 
-    // 1. Grayscale Heuristic (X-ray check)
+    // 1. Enhanced Heuristics (X-ray vs Not X-ray)
     int colorPixels = 0;
-    final int sampleCount = 50;
+    double totalLum = 0;
+    List<double> samples = [];
+    final int sampleCount = 100;
+    
     for (int i = 0; i < sampleCount; i++) {
-      final x = (i * 13) % imageData.width;
-      final y = (i * 17) % imageData.height;
+      final x = (i * 131) % imageData.width;
+      final y = (i * 173) % imageData.height;
       final pixel = imageData.getPixel(x, y);
-      if ((pixel.r - pixel.g).abs() > 20 || (pixel.r - pixel.b).abs() > 20) {
+      
+      // Color Check: Medical X-rays are perfectly grayscale
+      if ((pixel.r - pixel.g).abs() > 15 || (pixel.r - pixel.b).abs() > 15) {
         colorPixels++;
       }
+      
+      // Luminance: 0.299R + 0.587G + 0.114B
+      double lum = 0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
+      totalLum += lum;
+      samples.add(lum);
     }
-    final isLikelyXray = colorPixels < (sampleCount * 0.3);
+
+    final avgLum = totalLum / sampleCount;
+    
+    // Calculate Standard Deviation (Contrast)
+    double varianceSum = 0;
+    for (var lum in samples) {
+      varianceSum += math.pow(lum - avgLum, 2);
+    }
+    final stdDev = math.sqrt(varianceSum / sampleCount);
+
+    // Heuristic Logic:
+    // - Most pixels should be grayscale (< 20% colored)
+    // - Should not be overly bright (avgLum < 210) - Clouds are very bright
+    // - Should have characteristic contrast (stdDev > 40) - Clouds are often uniform
+    // - Should have some dark regions (avgLum > 30)
+    
+    final isColorFail = colorPixels > (sampleCount * 0.2);
+    final isBrightnessFail = avgLum > 210 || avgLum < 30;
+    final isContrastFail = stdDev < 42; 
+
+    final isLikelyXray = !isColorFail && !isBrightnessFail && !isContrastFail;
     
     if (!isLikelyXray) return _ImageProcessResult(isLikelyXray: false);
 

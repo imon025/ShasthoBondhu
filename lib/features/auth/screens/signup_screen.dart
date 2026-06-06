@@ -293,8 +293,8 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
               ],
             ),
           ),
+          ),
         ),
-      ),
       ),
     );
   }

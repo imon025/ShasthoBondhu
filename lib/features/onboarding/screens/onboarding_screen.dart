@@ -17,9 +17,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<Map<String, dynamic>> _onboardingData = [
     {
-      'icon': Icons.medical_services_rounded,
-      'title': 'AI Health\nDetection',
-      'description': 'Advanced AI technology to monitor and detect early symptoms of various diseases.',
+      'icon': Icons.health_and_safety_rounded,
+      'title': 'ShasthoBondhu 🩺',
+      'description': 'Your intelligent companion for all health-related needs. Let\'s start your journey to a healthier life.',
       'color': AppColors.onb1,
     },
     {
@@ -97,12 +97,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           // Bottom Controls Bar
           Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
+            bottom: 24,
+            left: 24,
+            right: 24,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              color: currentColor,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: currentColor,
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
               child: SafeArea(
                 top: false,
                 child: Row(
@@ -157,10 +167,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       duration: const Duration(milliseconds: 300),
       margin: const EdgeInsets.symmetric(horizontal: 4),
       height: 8,
-      width: 8,
+      width: _currentPage == index ? 24 : 8,
       decoration: BoxDecoration(
         color: _currentPage == index ? Colors.white : Colors.white.withValues(alpha: 0.5),
-        shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(4),
       ),
     );
   }

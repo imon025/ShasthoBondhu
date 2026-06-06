@@ -1,3 +1,4 @@
+
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'pneumonia_service_base.dart';
@@ -27,7 +28,7 @@ Future<Map<String, dynamic>> _processWebHeuristic(Map<String, dynamic> params) a
       'label': 'NOT AN X-RAY',
       'confidence': 1.0,
       'is_not_xray': true,
-      'warning': 'Not a chest X-ray. Please upload a valid grayscale chest X-ray report.',
+      'warning': 'Not a chest X-ray. Please upload a valid X-ray report.',
     };
   }
 

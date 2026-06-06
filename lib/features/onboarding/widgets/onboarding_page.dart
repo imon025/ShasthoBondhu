@@ -48,12 +48,12 @@ class OnboardingPage extends StatelessWidget {
           
           // Bottom Section with Text
           Text(
-            'WELCOME TO',
+            'Welcome to',
             style: TextStyle(
               color: activeColor,
               fontSize: 16,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 2.0,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
             ),
           ),
           const SizedBox(height: 12),
