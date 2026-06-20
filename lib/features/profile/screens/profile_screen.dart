@@ -1,6 +1,11 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../pneumonia/services/history_service.dart';
+import 'my_reports_tab.dart';
+import 'personal_report_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -12,6 +17,10 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   Map<String, dynamic>? _profileData;
+  int _detectCount = 0;
+  int _reportsCount = 0;
+  int _healthCount = 3; // still mocked for now
+  int _daysActive = 0;
 
   @override
   void initState() {
@@ -31,16 +40,423 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .eq('id', user.id)
           .maybeSingle();
 
+      // Fetch stats
+      final detectRes = await Supabase.instance.client
+          .from('detection_history')
+          .select('id')
+          .eq('user_id', user.id);
+      
+      final reportsRes = await Supabase.instance.client
+          .from('user_reports')
+          .select('id')
+          .eq('user_id', user.id);
+
       if (mounted) {
         setState(() {
           _profileData = data ?? {};
-          // Ensure contact_number exists conceptually
           _profileData!['contact_number'] = _profileData!['contact_number'] ?? '';
+          
+          _detectCount = (detectRes as List?)?.length ?? 0;
+          _reportsCount = (reportsRes as List?)?.length ?? 0;
+          
+          if (_profileData!['created_at'] != null) {
+             final createdAt = DateTime.parse(_profileData!['created_at']);
+             _daysActive = DateTime.now().difference(createdAt).inDays;
+          }
+
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Profile error: $e');
+      debugPrint('Profile error occurred');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        // Silently fail or show minimal snackbar
+      }
+    }
+  }
+
+  Future<void> _uploadProfilePicture() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    if (image == null) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      
+      if (kIsWeb) {
+        final bytes = await image.readAsBytes();
+        await Supabase.instance.client.storage
+            .from('avatars')
+            .uploadBinary(fileName, bytes);
+      } else {
+        await Supabase.instance.client.storage
+            .from('avatars')
+            .upload(fileName, File(image.path));
+      }
+
+      final imageUrl = Supabase.instance.client.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
+
+      await Supabase.instance.client
+          .from('profiles')
+          .update({'avatar_url': imageUrl})
+          .eq('id', user.id);
+
+      await _fetchProfileData();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile picture updated!')));
+      }
+    } catch (e) {
+      String errMsg = 'Unknown error';
+      try {
+        if (e is StorageException) {
+          errMsg = e.message;
+        } else {
+          errMsg = e.toString();
+        }
+      } catch(_) {}
+      
+      debugPrint('Avatar upload error: $errMsg');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $errMsg')));
+      }
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _openSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ProfileSettingsScreen(initialData: _profileData)),
+    );
+    // Refresh data when returning from settings
+    _fetchProfileData();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF3F4F6);
+    final cardColor = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final subTextColor = isDark ? Colors.white54 : Colors.black54;
+
+    return Scaffold(
+      backgroundColor: bgColor,
+      appBar: AppBar(
+        title: const Text('Profile'),
+        backgroundColor: Colors.transparent,
+        foregroundColor: textColor,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_none),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: _openSettings,
+          ),
+        ],
+      ),
+      body: _isLoading 
+        ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
+        : SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // TOP GRADIENT CARD
+              Material(
+                color: Colors.transparent,
+                child: Ink(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFB0C6D9), Color(0xFF3B434C)],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: _openSettings,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: _uploadProfilePicture,
+                                child: Stack(
+                                  alignment: Alignment.bottomRight,
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 40,
+                                      backgroundColor: const Color(0xFF80E0B4),
+                                      backgroundImage: _profileData?['avatar_url'] != null ? NetworkImage(_profileData!['avatar_url']) : null,
+                                      child: _profileData?['avatar_url'] == null ? const Icon(Icons.person, size: 50, color: Colors.white) : null,
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                                      child: const Icon(Icons.edit, size: 12, color: Colors.black87),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _profileData?['full_name'] ?? 'Not set',
+                                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _profileData?['email'] ?? 'Not set',
+                                      style: const TextStyle(color: Colors.white70, fontSize: 14),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right, color: Colors.white),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildTopStatIcon(Icons.calendar_month, Colors.blue, '$_daysActive'),
+                              _buildTopStatIcon(Icons.local_fire_department, Colors.redAccent, '$_detectCount'),
+                              _buildTopStatIcon(Icons.bolt, Colors.orangeAccent, '$_reportsCount'),
+                              _buildTopStatIcon(Icons.access_time_filled, Colors.green, '$_healthCount'),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // PERSONAL REPORT & INFO BUTTON
+              Material(
+                color: Colors.transparent,
+                child: Ink(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFE600), // Full yellow box
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(30),
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const PersonalReportScreen()));
+                    },
+                    child: Container(
+                      height: 60,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.table_chart_rounded, color: Colors.black87),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'Personal Report & Info',
+                              style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.chevron_right, color: Colors.black87, size: 20),
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 30),
+
+              // USER HISTORY GRID
+              _buildSectionHeader('User History', textColor),
+              const SizedBox(height: 16),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 2.2,
+                children: [
+                  _buildHistoryCard('Health', 'History', cardColor, textColor, subTextColor, () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const HealthHistoryScreen()));
+                  }),
+                  _buildHistoryCard('Detect', 'History', cardColor, textColor, subTextColor, () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const DetectHistoryScreen()));
+                  }),
+                  _buildHistoryCard('My Reports', 'Uploaded files', cardColor, textColor, subTextColor, () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(
+                      appBar: AppBar(title: const Text('My Reports')),
+                      body: const MyReportsTab()
+                    )));
+                  }),
+                ],
+              ),
+              const SizedBox(height: 30),
+            ],
+          ),
+        ),
+    );
+  }
+
+  Widget _buildTopStatIcon(IconData icon, Color iconColor, String value) {
+    return Column(
+      children: [
+        Icon(icon, color: iconColor, size: 20),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(String title, Color textColor) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: Colors.greenAccent,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.greenAccent.withOpacity(0.5),
+                blurRadius: 6,
+                spreadRadius: 2,
+              )
+            ]
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: textColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHistoryCard(String title, String subtitle, Color bgColor, Color textColor, Color subTextColor, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(color: subTextColor, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: subTextColor, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- PROFILE SETTINGS SCREEN ---
+
+class ProfileSettingsScreen extends StatefulWidget {
+  final Map<String, dynamic>? initialData;
+  const ProfileSettingsScreen({super.key, this.initialData});
+
+  @override
+  State<ProfileSettingsScreen> createState() => _ProfileSettingsScreenState();
+}
+
+class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
+  bool _isLoading = false;
+  late Map<String, dynamic> _profileData;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileData = widget.initialData != null ? Map.from(widget.initialData!) : {};
+    if (_profileData.isEmpty) {
+      _fetchProfileData();
+    }
+  }
+
+  Future<void> _fetchProfileData() async {
+    try {
+      setState(() => _isLoading = true);
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+      
+      final data = await Supabase.instance.client
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (mounted) {
+        setState(() {
+          _profileData = data ?? {};
+          _profileData['contact_number'] = _profileData['contact_number'] ?? '';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to load profile')));
@@ -49,32 +465,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _updateField(String fieldKeys, String title, String currentValue, {TextInputType inputType = TextInputType.text}) async {
-    final controller = TextEditingController(text: currentValue);
+    String? result;
     
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Edit $title'),
-          content: TextField(
-            controller: controller,
-            keyboardType: inputType,
-            decoration: InputDecoration(hintText: 'Enter your $title'),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, controller.text), 
-              child: const Text('Save')
-            ),
-          ],
-        );
+    if (inputType == TextInputType.datetime) {
+      final initialDate = DateTime.tryParse(currentValue) ?? DateTime.now();
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: initialDate,
+        firstDate: DateTime(1900),
+        lastDate: DateTime.now(),
+      );
+      if (picked != null) {
+        result = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
       }
-    );
+    } else {
+      final controller = TextEditingController(text: currentValue);
+      result = await showDialog<String>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Text('Edit $title'),
+            content: TextField(
+              controller: controller,
+              keyboardType: inputType,
+              decoration: InputDecoration(hintText: 'Enter your $title'),
+              autofocus: true,
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, controller.text), 
+                child: const Text('Save')
+              ),
+            ],
+          );
+        }
+      );
+    }
 
     if (result != null && result.trim() != currentValue) {
-      // Validate age
       dynamic parseResult = result.trim();
       if (fieldKeys == 'age') {
         parseResult = int.tryParse(result.trim());
@@ -97,7 +526,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$title updated!')));
         }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update: $e')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to update')));
         setState(() => _isLoading = false);
       }
     }
@@ -135,7 +564,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   await Supabase.instance.client.auth.updateUser(UserAttributes(password: pwd));
                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated successfully!')));
                 } catch(e) {
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to update password')));
                 } finally {
                   if (mounted) setState(() => _isLoading = false);
                 }
@@ -148,211 +577,122 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Profile'),
-        backgroundColor: theme.primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: _isLoading 
-        ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
-        : SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              // Avatar & Upload Placeholder
-              Center(
-                child: Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundColor: isDark ? const Color(0xFF2C2C54) : const Color(0xFF75E6DA),
-                      child: Icon(Icons.person, size: 50, color: isDark ? Colors.white : theme.primaryColor),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: InkWell(
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Upload Photo coming soon!')),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                              color: theme.primaryColor, shape: BoxShape.circle),
-                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
-                        ),
-                      ),
-                    )
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              
-              // User Details UI
-              Card(
-                elevation: 2,
-                color: theme.colorScheme.surface,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      _buildProfileField(Icons.person_outline, 'Name', _profileData?['full_name'] ?? 'Not set', 'full_name'),
-                      const Divider(),
-                      _buildProfileField(Icons.email_outlined, 'Email', _profileData?['email'] ?? 'Not set', 'email', inputType: TextInputType.emailAddress, editable: false), // Usually emails aren't editable via simple row unless you verify
-                      const Divider(),
-                      _buildProfileField(Icons.phone_outlined, 'Contact', _profileData?['contact_number'] ?? 'Not set', 'contact_number', inputType: TextInputType.phone),
-                      const Divider(),
-                      _buildProfileField(Icons.calendar_today_outlined, 'Age', _profileData?['age']?.toString() ?? 'Not set', 'age', inputType: TextInputType.number),
-                      const Divider(),
-                      _buildProfileField(Icons.wc_outlined, 'Gender', _profileData?['gender'] ?? 'Not set', 'gender'),
-                      const Divider(),
-                      _buildProfileField(Icons.medical_services_outlined, 'Ailments', _profileData?['ailments'] ?? 'Not set', 'ailments'),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.lock_outline),
-                          label: const Text('Change Password'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.primaryColor,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: _showChangePasswordDialog,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // History Section
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'User History',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : theme.primaryColor,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              DefaultTabController(
-                length: 2,
-                child: Column(
-                  children: [
-                    TabBar(
-                      labelColor: isDark ? Colors.white : theme.primaryColor,
-                      unselectedLabelColor: Colors.grey,
-                      indicatorColor: isDark ? Colors.white : theme.primaryColor,
-                      tabs: const [
-                        Tab(text: 'Health History'),
-                        Tab(text: 'Detect History'),
-                      ],
-                    ),
-                    SizedBox(
-                      height: 300,
-                      child: TabBarView(
-                        children: [
-                          // Health History Mock (Keep as is for now)
-                          ListView.builder(
-                            itemCount: 3,
-                            itemBuilder: (context, index) => ListTile(
-                              leading: const Icon(Icons.favorite, color: Colors.redAccent),
-                              title: Text('Health Record #${index + 1}', style: theme.textTheme.bodyLarge),
-                              subtitle: Text('12 Oct 2026', style: theme.textTheme.bodyMedium),
-                            ),
-                          ),
-                          // LIVE Detect History
-                          FutureBuilder<List<Map<String, dynamic>>>(
-                            future: HistoryService().fetchCloudHistory(),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return const Center(child: CircularProgressIndicator());
-                              }
-                              
-                              final data = snapshot.data ?? [];
-                              if (data.isEmpty) {
-                                return Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(20),
-                                    child: Text('No history found', style: TextStyle(color: isDark ? Colors.white70 : Colors.grey)),
-                                  ),
-                                );
-                              }
-
-                              return ListView.builder(
-                                itemCount: data.length,
-                                itemBuilder: (context, index) {
-                                  final item = data[index];
-                                  final label = item['label'] ?? 'Unknown';
-                                  final confidence = (item['confidence'] ?? 0.0) * 100;
-                                  final date = DateTime.parse(item['created_at']).toString().split(' ')[0];
-                                  final patient = item['patient_name'] ?? 'Self';
-
-                                  return ListTile(
-                                    leading: Icon(
-                                      label == 'PNEUMONIA' ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-                                      color: label == 'PNEUMONIA' ? Colors.red : Colors.green,
-                                    ),
-                                    title: Text('$label ($patient)', style: theme.textTheme.bodyLarge),
-                                    subtitle: Text('${confidence.toStringAsFixed(1)}% Confidence • $date', style: theme.textTheme.bodyMedium),
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    )
-                  ],
-                ),
-              )
-            ],
-          ),
-        ),
+  Widget _buildSettingTile(String title, String? value, String dbKey, {TextInputType inputType = TextInputType.text}) {
+    final displayValue = (value == null || value.isEmpty || value == 'Not set') ? 'N/A' : value;
+    return ListTile(
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(displayValue),
+      trailing: const Icon(Icons.edit, size: 20),
+      onTap: () => _updateField(dbKey, title, displayValue == 'N/A' ? '' : displayValue, inputType: inputType),
     );
   }
 
-  Widget _buildProfileField(IconData icon, String label, String value, String dbKey, {TextInputType inputType = TextInputType.text, bool editable = true}) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, color: isDark ? const Color(0xFF4DD0E1) : const Color(0xFF033A6B)),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                Text(value, style: TextStyle(fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
-              ],
-            ),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Profile Settings'),
+      ),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _buildSettingTile('Name', _profileData['full_name'], 'full_name'),
+              const Divider(),
+              ListTile(
+                title: const Text('Email', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(_profileData['email'] ?? 'N/A'),
+                trailing: const Icon(Icons.lock, size: 16, color: Colors.grey),
+              ),
+              const Divider(),
+              _buildSettingTile('Contact', _profileData['contact_number'], 'contact_number', inputType: TextInputType.phone),
+              const Divider(),
+              _buildSettingTile('Age', _profileData['age']?.toString(), 'age', inputType: TextInputType.number),
+              const Divider(),
+              const Divider(),
+              _buildSettingTile('Gender', _profileData['gender'], 'gender'),
+              const Divider(),
+              _buildSettingTile('Date of Birth', _profileData['date_of_birth'], 'date_of_birth', inputType: TextInputType.datetime),
+              const Divider(),
+              _buildSettingTile('Blood Group', _profileData['blood_group'], 'blood_group'),
+              const Divider(),
+              _buildSettingTile('Address', _profileData['address'], 'address', inputType: TextInputType.streetAddress),
+              const Divider(),
+              _buildSettingTile('Ailments', _profileData['ailments'], 'ailments'),
+              const SizedBox(height: 30),
+              ElevatedButton.icon(
+                onPressed: _showChangePasswordDialog,
+                icon: const Icon(Icons.lock_reset),
+                label: const Text('Change Password'),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
           ),
-          if (editable)
-            IconButton(
-              icon: const Icon(Icons.edit, color: Colors.grey, size: 20),
-              onPressed: () => _updateField(dbKey, label, value == 'Not set' ? '' : value, inputType: inputType),
-            ),
-        ],
+    );
+  }
+}
+
+// --- HISTORY SCREENS ---
+
+class HealthHistoryScreen extends StatelessWidget {
+  const HealthHistoryScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Health History')),
+      body: ListView.builder(
+        itemCount: 3,
+        itemBuilder: (context, index) => ListTile(
+          leading: const Icon(Icons.favorite, color: Colors.redAccent),
+          title: Text('Health Record #${index + 1}'),
+          subtitle: const Text('12 Oct 2026'),
+        ),
+      ),
+    );
+  }
+}
+
+class DetectHistoryScreen extends StatelessWidget {
+  const DetectHistoryScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Detect History')),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: HistoryService().fetchCloudHistory(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final data = snapshot.data ?? [];
+          if (data.isEmpty) {
+            return const Center(child: Text('No history found'));
+          }
+          return ListView.builder(
+            itemCount: data.length,
+            itemBuilder: (context, index) {
+              final item = data[index];
+              final label = item['label'] ?? 'Unknown';
+              final confidence = (item['confidence'] ?? 0.0) * 100;
+              final date = DateTime.parse(item['created_at']).toString().split(' ')[0];
+              final patient = item['patient_name'] ?? 'Self';
+              return ListTile(
+                leading: Icon(
+                  label == 'PNEUMONIA' ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                  color: label == 'PNEUMONIA' ? Colors.red : Colors.green,
+                ),
+                title: Text('$label ($patient)'),
+                subtitle: Text('${confidence.toStringAsFixed(1)}% Confidence • $date'),
+              );
+            },
+          );
+        },
       ),
     );
   }

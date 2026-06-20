@@ -23,6 +23,7 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> with Tick
   List<dynamic> _allElements = [];
   bool _isLoading = true;
   List<LatLng> _routePoints = [];
+  String? _routeInfo;
 
   late String _selectedFilter;
 
@@ -98,6 +99,64 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> with Tick
     _updateMarkers();
   }
 
+  List<LatLng> _calculateAStarPath(List<LatLng> waypoints) {
+    if (waypoints.isEmpty) return [];
+    
+    List<AStarNode> nodes = waypoints.map((wp) => AStarNode(wp)).toList();
+    AStarNode startNode = nodes.first;
+    AStarNode targetNode = nodes.last;
+    
+    List<AStarNode> openSet = [startNode];
+    Set<AStarNode> closedSet = {};
+    final distanceCalc = const Distance();
+    
+    while (openSet.isNotEmpty) {
+      AStarNode currentNode = openSet.first;
+      for (int i = 1; i < openSet.length; i++) {
+        if (openSet[i].fCost < currentNode.fCost || 
+            (openSet[i].fCost == currentNode.fCost && openSet[i].hCost < currentNode.hCost)) {
+          currentNode = openSet[i];
+        }
+      }
+      
+      openSet.remove(currentNode);
+      closedSet.add(currentNode);
+      
+      if (currentNode == targetNode) {
+        List<LatLng> path = [];
+        AStarNode? current = targetNode;
+        while (current != null) {
+          path.add(current.position);
+          current = current.parent;
+        }
+        return path.reversed.toList();
+      }
+      
+      int currentIndex = nodes.indexOf(currentNode);
+      List<AStarNode> neighbors = [];
+      if (currentIndex > 0) neighbors.add(nodes[currentIndex - 1]);
+      if (currentIndex < nodes.length - 1) neighbors.add(nodes[currentIndex + 1]);
+      
+      for (AStarNode neighbor in neighbors) {
+        if (closedSet.contains(neighbor)) continue;
+        
+        double moveCost = distanceCalc.as(LengthUnit.Meter, currentNode.position, neighbor.position);
+        double newCostToNeighbor = currentNode.gCost + moveCost;
+        
+        if (newCostToNeighbor < neighbor.gCost || !openSet.contains(neighbor)) {
+          neighbor.gCost = newCostToNeighbor;
+          neighbor.hCost = distanceCalc.as(LengthUnit.Meter, neighbor.position, targetNode.position);
+          neighbor.parent = currentNode;
+          
+          if (!openSet.contains(neighbor)) {
+            openSet.add(neighbor);
+          }
+        }
+      }
+    }
+    return waypoints;
+  }
+
   Future<void> _fetchRoute(LatLng destination) async {
     if (_currentLocation == null) return;
 
@@ -113,11 +172,15 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> with Tick
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['routes'] != null && (data['routes'] as List).isNotEmpty) {
-          final geometry = data['routes'][0]['geometry'];
+          final route = data['routes'][0];
+          final geometry = route['geometry'];
+          final distance = route['distance']; // in meters
           final coordinates = geometry['coordinates'] as List;
           
           setState(() {
-            _routePoints = coordinates.map((coord) => LatLng(coord[1], coord[0])).toList();
+            final rawPoints = coordinates.map((coord) => LatLng(coord[1], coord[0])).toList();
+            _routePoints = _calculateAStarPath(rawPoints);
+            _routeInfo = 'Shortest Path: ${(distance / 1000).toStringAsFixed(2)} km';
           });
           
           final bounds = LatLngBounds.fromPoints([_currentLocation!, destination, ..._routePoints]);
@@ -370,6 +433,49 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> with Tick
               ),
             ),
 
+          if (_routeInfo != null)
+            Positioned(
+              top: kToolbarHeight + MediaQuery.of(context).padding.top + 70,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent.withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+                        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.route_rounded, color: Colors.white, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            _routeInfo!,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () => setState(() {
+                              _routePoints = [];
+                              _routeInfo = null;
+                            }),
+                            child: const Icon(Icons.close_rounded, color: Colors.white70, size: 18),
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
           if (_currentLocation != null)
             Positioned(
               top: kToolbarHeight + MediaQuery.of(context).padding.top + 16,
@@ -437,6 +543,7 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> with Tick
           setState(() {
             _selectedFilter = label;
             _routePoints = [];
+            _routeInfo = null;
           });
           _updateMarkers();
         }
@@ -702,4 +809,15 @@ class _AnimatedMedicalPinMarkerState extends State<_AnimatedMedicalPinMarker> wi
       ],
     );
   }
+}
+
+class AStarNode {
+  final LatLng position;
+  AStarNode? parent;
+  double gCost = 0;
+  double hCost = 0;
+  
+  double get fCost => gCost + hCost;
+  
+  AStarNode(this.position);
 }

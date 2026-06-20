@@ -1,5 +1,5 @@
 # ShasthoBondhu – Health at a Glance, Friend at Heart
-
+imonfarazi01@gmail.com-> supabase 
 ShasthoBondhu is an AI-powered healthcare mobile application built with Flutter, designed to provide smart health assistance, disease detection, and nearby medical support — all in one platform.
 
 ## 📱 Overview

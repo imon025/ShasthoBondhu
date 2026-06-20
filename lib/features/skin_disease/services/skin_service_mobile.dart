@@ -26,10 +26,10 @@ _ImageProcessResult _processImageBackground(Uint8List imageBytes) {
     for (var y = 0; y < 224; y++) {
       for (var x = 0; x < 224; x++) {
         var pixel = resizedImage.getPixel(x, y);
-        // MobileNetV2 preprocessing: (pixel / 127.5) - 1.0
-        input[bufferIndex++] = (pixel.r / 127.5) - 1.0;
-        input[bufferIndex++] = (pixel.g / 127.5) - 1.0;
-        input[bufferIndex++] = (pixel.b / 127.5) - 1.0;
+        // EfficientNetB0 preprocessing: 0.0 to 255.0
+        input[bufferIndex++] = pixel.r.toDouble();
+        input[bufferIndex++] = pixel.g.toDouble();
+        input[bufferIndex++] = pixel.b.toDouble();
       }
     }
     
@@ -92,7 +92,12 @@ class SkinServiceImpl implements SkinService {
         }
       }
 
-      String label = maxIndex != -1 ? _labels[maxIndex] : 'Unknown';
+      String label = maxIndex != -1 ? _labels[maxIndex] : 'Unknown_Normal';
+      
+      // If confidence is too low, fallback to normal/unknown to avoid false positives
+      if (maxProb < 0.45) {
+        label = 'Unknown_Normal';
+      }
 
       return {
         'label': label,

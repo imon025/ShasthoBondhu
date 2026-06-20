@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'nearby_hospitals_screen.dart';
 import 'detection_options_page.dart';
 
@@ -233,10 +234,24 @@ class DashboardScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(width: 12),
-              const CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.white24,
-                child: Icon(Icons.person, color: Colors.white), // Fallback icon
+              FutureBuilder(
+                future: Supabase.instance.client.auth.currentUser != null
+                    ? Supabase.instance.client
+                        .from('profiles')
+                        .select('avatar_url')
+                        .eq('id', Supabase.instance.client.auth.currentUser!.id)
+                        .maybeSingle()
+                    : Future.value(null),
+                builder: (context, snapshot) {
+                  final data = snapshot.data as Map<String, dynamic>?;
+                  final avatarUrl = data?['avatar_url'] as String?;
+                  return CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Colors.white24,
+                    backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                    child: avatarUrl == null ? const Icon(Icons.person, color: Colors.white) : null,
+                  );
+                },
               ),
             ],
           )
@@ -714,7 +729,7 @@ class _DashboardMapSectionState extends State<DashboardMapSection> {
         }
       }
     } catch (e) {
-      debugPrint('Failed to fetch hospitals: $e');
+      debugPrint('Failed to fetch hospitals');
     }
   }
 

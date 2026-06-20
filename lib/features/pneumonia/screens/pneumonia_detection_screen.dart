@@ -4,6 +4,11 @@ import 'package:image_picker/image_picker.dart';
 import '../services/pneumonia_service.dart';
 import '../services/history_service.dart';
 import '../../../core/theme/app_colors.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:http/http.dart' as http;
+import '../../profile/utils/download_helper.dart';
 
 import '../../../core/widgets/camera_capture_screen.dart';
 
@@ -276,6 +281,223 @@ class _PneumoniaDetectionScreenState extends State<PneumoniaDetectionScreen>
     );
   }
 
+  Future<void> _downloadReport() async {
+    if (_imageBytes == null || _result == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No result to download')));
+      return;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generating PDF...')));
+    }
+
+    // Fetch user profile data
+    Map<String, dynamic>? profile;
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      try {
+        profile = await Supabase.instance.client
+            .from('profiles')
+            .select('full_name, age, contact_number, avatar_url, gender, date_of_birth, blood_group, address')
+            .eq('id', user.id)
+            .maybeSingle();
+      } catch (e) {
+        debugPrint('Failed to load profile for pdf: $e');
+      }
+    }
+
+    final String name = profile?['full_name'] ?? 'Unknown User';
+    final String age = profile?['age']?.toString() ?? 'N/A';
+    final String contact = profile?['contact_number'] ?? 'N/A';
+    final String gender = profile?['gender'] ?? 'N/A';
+    final String dob = profile?['date_of_birth'] ?? 'N/A';
+    final String bloodGroup = profile?['blood_group'] ?? 'N/A';
+    final String address = profile?['address'] ?? 'N/A';
+    final String reportDate = "${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year}";
+    final String avatarUrl = profile?['avatar_url'] ?? '';
+
+    pw.MemoryImage? profileImage;
+    if (avatarUrl.isNotEmpty) {
+      try {
+        final response = await http.get(Uri.parse(avatarUrl));
+        if (response.statusCode == 200) {
+          profileImage = pw.MemoryImage(response.bodyBytes);
+        }
+      } catch (e) {
+        debugPrint('Failed to load avatar image: $e');
+      }
+    }
+
+    final pdf = pw.Document();
+    final scanImage = pw.MemoryImage(_imageBytes!);
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context context) {
+          pw.Widget buildInfoRow(String title, String value) {
+            return pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Container(
+                  width: 75,
+                  child: pw.Text(title, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                ),
+                pw.Text(': ', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                pw.Expanded(
+                  child: pw.Text(value, style: pw.TextStyle(fontSize: 10)),
+                ),
+              ]
+            );
+          }
+
+          return pw.Container(
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.black, width: 2),
+            ),
+            padding: const pw.EdgeInsets.all(24),
+            child: pw.Stack(
+              children: [
+                pw.Center(
+                  child: pw.Transform.rotate(
+                    angle: -0.5,
+                    child: pw.Text(
+                      'ShasthoBondhu',
+                      softWrap: false,
+                      style: pw.TextStyle(
+                        fontSize: 40,
+                        color: PdfColor.fromHex('#E0E0E0'),
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Row(
+                              children: [
+                                pw.Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: const pw.BoxDecoration(color: PdfColors.red, shape: pw.BoxShape.circle),
+                                  child: pw.Center(child: pw.Text('+', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 16))),
+                                ),
+                                pw.SizedBox(width: 8),
+                                pw.Text('MEDICAL RECORD', style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
+                              ],
+                            ),
+                            pw.SizedBox(height: 16),
+                            pw.Container(
+                              padding: const pw.EdgeInsets.all(12),
+                              decoration: const pw.BoxDecoration(color: PdfColors.white),
+                              width: 320,
+                              height: 125,
+                              child: pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  buildInfoRow('Name', name),
+                                  buildInfoRow('Age', age),
+                                  buildInfoRow('Gender', gender),
+                                  buildInfoRow('Date of Birth', dob),
+                                  buildInfoRow('Blood Group', bloodGroup),
+                                  buildInfoRow('Contact', contact),
+                                  buildInfoRow('Address', address),
+                                  buildInfoRow('Report Date', reportDate),
+                                ]
+                              )
+                            ),
+                          ]
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.only(top: 40),
+                          child: pw.Container(
+                            width: 125,
+                            height: 125,
+                            decoration: pw.BoxDecoration(
+                              shape: pw.BoxShape.circle,
+                              color: PdfColor.fromHex('#D7CCC8'),
+                              image: profileImage != null 
+                                 ? pw.DecorationImage(image: profileImage, fit: pw.BoxFit.cover)
+                                 : null,
+                            ),
+                            child: profileImage == null ? pw.Center(
+                              child: pw.Column(
+                                mainAxisAlignment: pw.MainAxisAlignment.center,
+                                children: [
+                                   pw.Container(width: 35, height: 35, decoration: const pw.BoxDecoration(shape: pw.BoxShape.circle, color: PdfColors.grey500)),
+                                   pw.SizedBox(height: 4),
+                                   pw.Container(width: 60, height: 30, decoration: const pw.BoxDecoration(color: PdfColors.grey500, borderRadius: pw.BorderRadius.vertical(top: pw.Radius.circular(30)))),
+                                ]
+                              )
+                            ) : null
+                          )
+                        )
+                      ]
+                    ),
+                    pw.SizedBox(height: 32),
+                    pw.Text('Pneumonia Detection Result', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 16),
+                    pw.Center(
+                      child: pw.Container(
+                        height: 250,
+                        child: pw.Image(scanImage, fit: pw.BoxFit.contain),
+                      ),
+                    ),
+                    pw.SizedBox(height: 24),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(16),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.grey200,
+                        borderRadius: pw.BorderRadius.circular(10),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Analysis: ${_result!["label"]}', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                          if (_result!['confidence'] != null)
+                            pw.Text('Confidence: ${(_result!['confidence'] * 100).toStringAsFixed(1)}%', style: pw.TextStyle(fontSize: 14)),
+                          pw.SizedBox(height: 8),
+                          pw.Text('Note: This is an AI-generated analysis. Please consult a qualified medical professional for an accurate diagnosis.', style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700)),
+                        ]
+                      )
+                    ),
+                    pw.Spacer(),
+                    pw.Align(
+                      alignment: pw.Alignment.centerRight,
+                      child: pw.Text('Generated by shasthobondhu (Farazi)', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600, fontStyle: pw.FontStyle.italic)),
+                    )
+                  ]
+                )
+              ]
+            )
+          );
+        }
+      )
+    );
+
+    try {
+      final bytes = await pdf.save();
+      await downloadBytes('pneumonia_report.pdf', bytes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Downloaded successfully! (Saved as PDF)')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to download: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isPneumonia = _result?['label'] == 'PNEUMONIA';
@@ -522,19 +744,36 @@ class _PneumoniaDetectionScreenState extends State<PneumoniaDetectionScreen>
                               ),
                             ),
                             const SizedBox(height: 20),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: _showSaveDialog,
-                                icon: const Icon(Icons.cloud_upload_outlined, color: Colors.white),
-                                label: const Text('SAVE TO CLINICAL HISTORY'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.teal,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: _showSaveDialog,
+                                    icon: const Icon(Icons.cloud_upload_outlined, color: Colors.white, size: 20),
+                                    label: const Text('SAVE', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.teal,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: _downloadReport,
+                                    icon: const Icon(Icons.picture_as_pdf, color: Colors.white, size: 20),
+                                    label: const Text('DOWNLOAD', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.blueAccent,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

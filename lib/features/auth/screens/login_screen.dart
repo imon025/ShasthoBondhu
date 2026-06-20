@@ -115,30 +115,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       mainAxisAlignment: MainAxisAlignment.center, // Centered vertically
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Hero(
-                          tag: 'logo',
-                          child: Icon(
-                            Icons.health_and_safety,
-                            size: 90,
-                            color: Theme.of(context).primaryColor,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Welcome Back',
-                          style: Theme.of(context).textTheme.headlineLarge,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Your health is our priority',
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                color: Colors.grey[600],
-                              ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 40),
-                        // The Auth Panel
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
@@ -154,6 +130,29 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           ),
                           child: Column(
                             children: [
+                              Hero(
+                                tag: 'logo',
+                                child: Icon(
+                                  Icons.health_and_safety,
+                                  size: 90,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              Text(
+                                'Welcome Back',
+                                style: Theme.of(context).textTheme.headlineLarge,
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Your health is our priority',
+                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                      color: Colors.grey[600],
+                                    ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 40),
                               CustomTextField(
                                 controller: _emailController,
                                 label: 'Email Address',
@@ -196,27 +195,27 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                     : const Text('Login'),
                                 ),
                               ),
+                              const SizedBox(height: 24),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    "Don't have an account?",
+                                    style: TextStyle(color: Colors.grey[700]),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (context) => const SignupScreen()),
+                                      );
+                                    },
+                                    child: const Text('Sign Up'),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
-                        ),
-                        const SizedBox(height: 32),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              "Don't have an account?",
-                              style: TextStyle(color: Colors.grey[700]),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const SignupScreen()),
-                                );
-                              },
-                              child: const Text('Sign Up'),
-                            ),
-                          ],
                         ),
                       ],
                     ),

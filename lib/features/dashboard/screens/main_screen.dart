@@ -61,7 +61,7 @@ class _MainScreenState extends State<MainScreen> {
                 _buildNavItem(0, Icons.home_filled, 'Home'),
                 _buildNavItem(1, Icons.near_me_outlined, 'Nearby'),
                 _buildNavItem(2, Icons.search, 'Detect'),
-                _buildNavItem(3, Icons.settings_outlined, 'Settings'),
+                _buildNavItem(3, Icons.person_outline, 'Profile'),
               ],
             ),
           ),

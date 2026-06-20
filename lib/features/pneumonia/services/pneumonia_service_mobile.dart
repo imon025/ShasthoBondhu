@@ -72,10 +72,11 @@ _ImageProcessResult _processImageBackground(Uint8List imageBytes) {
     for (var y = 0; y < 224; y++) {
       for (var x = 0; x < 224; x++) {
         var pixel = resizedImage.getPixel(x, y);
-        // MobileNetV2 preprocessing: (pixel / 127.5) - 1.0
-        input[bufferIndex++] = (pixel.r / 127.5) - 1.0;
-        input[bufferIndex++] = (pixel.g / 127.5) - 1.0;
-        input[bufferIndex++] = (pixel.b / 127.5) - 1.0;
+        // MobileNetV2 preprocessing is built into the TFLite model graph,
+        // so we need to provide raw pixel values (0.0 to 255.0).
+        input[bufferIndex++] = pixel.r.toDouble();
+        input[bufferIndex++] = pixel.g.toDouble();
+        input[bufferIndex++] = pixel.b.toDouble();
       }
     }
     
