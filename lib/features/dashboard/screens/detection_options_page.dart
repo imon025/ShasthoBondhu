@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../pneumonia/screens/pneumonia_detection_screen.dart';
 import '../../skin_disease/screens/skin_detection_screen.dart';
+import '../../medicine_suggestion/screens/medicine_suggestion_screen.dart';
 
 class DetectionOptionsPage extends StatelessWidget {
   const DetectionOptionsPage({super.key});
@@ -91,8 +92,9 @@ class DetectionOptionsPage extends StatelessWidget {
               icon: Icons.medication_outlined,
               color: Colors.teal,
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Medicine Suggestion coming soon!')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const MedicineSuggestionScreen()),
                 );
               },
             ),
