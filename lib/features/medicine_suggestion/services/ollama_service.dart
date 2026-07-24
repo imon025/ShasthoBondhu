@@ -16,7 +16,125 @@ class OllamaService {
   // The model specified by the user
   static const String _model = 'qwen3:4b';
 
-  static Stream<String> streamMessage(String message, List<Map<String, String>> history) async* {
+  static Stream<String> streamMessage(String message, List<Map<String, String>> history, {String ragContext = ''}) async* {
+    // Check for fast basic questions to bypass the AI generation time
+    final lowerMessage = message.trim().toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '');
+    
+    final basicResponses = {
+      'hello': 'Hi! 👋 How can I help you?',
+      'hi': 'Hello! 😊',
+      'hey': 'Hey there!',
+      'how are you': "I'm doing well! How about you?",
+      'how are you doing': "I'm good! Thanks for asking 😊",
+      'whats up': 'Not much! Just here to help you.',
+      'good morning': 'Good morning! 🌞',
+      'good night': 'Good night! 😴',
+      'good evening': 'Good evening! 🌙',
+      'bye': 'Bye! Take care 👋',
+      'see you': 'See you soon!',
+      'thank you': "You're welcome!",
+      'thanks': 'Happy to help!',
+      'ok': '👍',
+      'okay': 'Alright!',
+      'yes': 'Great!',
+      'no': 'Okay 👍',
+      'maybe': 'Alright, let me know 😊',
+      'who are you': "I'm your AI assistant.",
+      'what is your name': "I'm ShasthoBondhu assistant.",
+      'are you human': "No, I'm an AI.",
+      'are you real': "I'm a virtual assistant.",
+      'can you help me': 'Yes! Tell me what you need.',
+      'help': "I'm here to help 😊",
+      'i need help': 'Sure! What do you need help with?',
+      'nice': '😊',
+      'cool': 'Glad you liked it!',
+      'wow': '😊',
+      'hmm': 'Thinking... tell me more.',
+      'lol': '😄',
+      'haha': '😄',
+      'good job': 'Thank you!',
+      'well done': 'Appreciate it!',
+      'sorry': "It's okay 😊",
+      'my bad': 'No problem!',
+      'excuse me': 'Yes, how can I help?',
+      'please': 'Sure 😊',
+      'i dont know': "That's okay, I can help you.",
+      'i understand': '👍',
+      'i dont understand': 'Let me explain simply.',
+      'explain': 'Sure! What should I explain?',
+      'tell me': 'Okay, tell me your question.',
+      'can you talk': 'Yes, I can chat with you.',
+      'are you busy': "No, I'm always ready!",
+      'are you free': 'Yes 😊',
+      'what can you do': 'I can chat and help answer questions.',
+      'nothing': 'Okay 👍',
+      'hmm okay': 'Alright!',
+      'good': '👍',
+      'bad': 'Oh okay...',
+      'i am bored': 'Want to chat about something fun?',
+      'i am sad': "I'm here if you want to talk.",
+      'i am happy': "That's great! 😊",
+      'i am angry': "Take a deep breath, I'm here to help.",
+      'i am tired': 'You should take some rest.',
+      'what time is it': "I can't check live time, but your device can.",
+      'what day is it': 'You can check your device calendar.',
+      'where are you': "I'm in your app 😊",
+      'do you know me': 'Only what you tell me.',
+      'remember me': 'I can remember if your app supports memory.',
+      'forget it': 'Okay 👍',
+      'are you online': 'Yes!',
+      'are you offline': "I'm ready whenever you are.",
+      'open app': 'Sure!',
+      'close app': 'Okay 👋',
+      'restart': 'Restarting...',
+      'stop': 'Okay.',
+      'continue': 'Sure!',
+      'next': 'Alright!',
+      'back': 'Going back.',
+      'save': 'Saved 👍',
+      'delete': 'Deleted.',
+      'edit': "Sure, let's edit it.",
+      'send': 'Sent!',
+      'receive': 'Received 👍',
+      'confirm': 'Confirmed.',
+      'cancel': 'Cancelled.',
+      'open': 'Opening...',
+      'close': 'Closing...',
+      'login': 'Please enter your details.',
+      'logout': 'Logged out.',
+      'register': "Let's create your account.",
+      'sign up': 'Starting signup.',
+      'sign in': 'Please sign in.',
+      'error': 'Something went wrong.',
+      'bug': "I'll try to fix it.",
+      'problem': 'Tell me more about it.',
+      'issue': "I'm here to help.",
+      'fix it': 'Working on it.',
+      'update': 'Updating...',
+      'done': 'Great!',
+      'finish': 'Finished 👍',
+      'start': "Let's begin!",
+      'wait': 'Okay, waiting...',
+      'later': 'Alright!',
+      'now': 'Sure!',
+      'maybe later': 'Okay 😊',
+      'i think': 'Tell me your thoughts.',
+      'i guess': 'Alright 👍',
+      'nice to meet you': 'Nice to meet you too! 😊',
+    };
+
+    if (basicResponses.containsKey(lowerMessage)) {
+      final responseText = basicResponses[lowerMessage]!;
+      final words = responseText.split(' ');
+      
+      // Simulate typing delay for a natural streaming feel (word by word)
+      for (int i = 0; i < words.length; i++) {
+        await Future.delayed(const Duration(milliseconds: 40));
+        yield words[i] + (i < words.length - 1 ? ' ' : '');
+      }
+      return;
+    }
+
     final url = Uri.parse('$_baseUrl/api/chat');
     
     // Convert history and new message to Ollama chat format
@@ -30,12 +148,8 @@ class OllamaService {
       'content': message,
     });
     
-    if (messages.where((m) => m['role'] == 'system').isEmpty) {
-      messages.insert(0, {
-        'role': 'system',
-        'content': '''Rules:
+    final systemPrompt = '''Rules:
 - Be polite, helpful, and concise.
-- Keep answers under 80 words unless the user asks for more detail.
 - Do not diagnose diseases with certainty.
 - Suggest basic self-care for common symptoms.
 - Recommend seeing a doctor if symptoms are severe, persistent, or emergency-related.
@@ -43,6 +157,9 @@ class OllamaService {
 - If the user asks about a medicine, explain its common uses, common side effects, and general precautions.
 - If the user says "hello", "hi", "hey", or similar greetings, greet them warmly.
 - If the question is unrelated to health, answer briefly and politely.
+
+RAG Context (User's Clinical History):
+${ragContext.isNotEmpty ? ragContext : "No clinical history available."}
 
 Examples:
 
@@ -89,9 +206,13 @@ User: I feel tired.
 Assistant: Make sure you get enough sleep, drink plenty of water, eat balanced meals, and take breaks. If fatigue continues for more than two weeks or is severe, consult a doctor.
 
 User: What is paracetamol used for?
-Assistant: Paracetamol is commonly used to reduce fever and relieve mild to moderate pain such as headaches, toothaches, and muscle aches. Follow the recommended dosage and consult a healthcare professional if you have liver disease or other concerns.''',
-      });
-    }
+Assistant: Paracetamol is commonly used to reduce fever and relieve mild to moderate pain such as headaches, toothaches, and muscle aches. Follow the recommended dosage and consult a healthcare professional if you have liver disease or other concerns.''';
+
+    messages.removeWhere((m) => m['role'] == 'system');
+    messages.insert(0, {
+      'role': 'system',
+      'content': systemPrompt,
+    });
 
     final request = http.Request('POST', url);
     request.headers['Content-Type'] = 'application/json';

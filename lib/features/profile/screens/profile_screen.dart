@@ -151,31 +151,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final subTextColor = isDark ? Colors.white54 : Colors.black54;
 
     return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        title: const Text('Profile'),
-        backgroundColor: Colors.transparent,
-        foregroundColor: textColor,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none),
-            onPressed: () {},
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF436B46), Color(0xFF2E4E32)], // Soft green gradient
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: [0.0, 0.4], // Gradient only at the top
           ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: _openSettings,
-          ),
-        ],
-      ),
-      body: _isLoading 
-        ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
-        : SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
+        child: SafeArea(
+          bottom: false,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // TOP GRADIENT CARD
+              _buildHeader(),
+              const SizedBox(height: 20),
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(30),
+                      topRight: Radius.circular(30),
+                    ),
+                  ),
+                  child: _isLoading 
+                    ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // TOP GRADIENT CARD
               Material(
                 color: Colors.transparent,
                 child: Ink(
@@ -327,10 +335,86 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   }),
                 ],
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 100), // Padding for bottom nav
             ],
           ),
         ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.spa_rounded, color: Color(0xFF90B094), size: 30),
+              const SizedBox(width: 10),
+              const Text(
+                'Shasthobondhu',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
+                  ),
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFF4B4B),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Text(
+                        '12',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              InkWell(
+                onTap: _openSettings,
+                borderRadius: BorderRadius.circular(30),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.settings_rounded, color: Colors.white, size: 24),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

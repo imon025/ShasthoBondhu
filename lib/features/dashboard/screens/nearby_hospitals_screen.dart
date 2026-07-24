@@ -6,6 +6,7 @@ import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class NearbyHospitalsScreen extends StatefulWidget {
   final String initialFilter;
@@ -312,33 +313,34 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> with Tick
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.black87),
-          onPressed: () {
-            if (widget.onBack != null) {
-              widget.onBack!();
-            } else {
-              Navigator.pop(context);
-            }
-          },
-        ),
-        title: const Text('Nearby', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        flexibleSpace: ClipRRect(
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              color: Colors.white.withValues(alpha: 0.7),
-            ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF436B46), Color(0xFF2E4E32)], // Soft green gradient
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: [0.0, 0.4], // Gradient only at the top
           ),
         ),
-      ),
-      body: Stack(
-        children: [
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 20),
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF5F6F8),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(30),
+                      topRight: Radius.circular(30),
+                    ),
+                  ),
+                  child: Stack(
+                    children: [
           if (_currentLocation == null)
             const Center(child: CircularProgressIndicator(color: sageGreen))
           else
@@ -407,7 +409,7 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> with Tick
 
           if (_isLoading && _currentLocation != null)
             Positioned(
-              top: kToolbarHeight + 80,
+              top: 80,
               left: 0,
               right: 0,
               child: Center(
@@ -435,7 +437,7 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> with Tick
 
           if (_routeInfo != null)
             Positioned(
-              top: kToolbarHeight + MediaQuery.of(context).padding.top + 70,
+              top: 70,
               left: 0,
               right: 0,
               child: Center(
@@ -478,7 +480,7 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> with Tick
 
           if (_currentLocation != null)
             Positioned(
-              top: kToolbarHeight + MediaQuery.of(context).padding.top + 16,
+              top: 16,
               left: 0,
               right: 0,
               child: SingleChildScrollView(
@@ -527,6 +529,102 @@ class _NearbyHospitalsScreenState extends State<NearbyHospitalsScreen> with Tick
                 ),
               ),
             )
+        ],
+      ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              if (widget.onBack != null || Navigator.canPop(context)) ...[
+                GestureDetector(
+                  onTap: () {
+                    if (widget.onBack != null) {
+                      widget.onBack!();
+                    } else {
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+              ],
+              const Icon(Icons.spa_rounded, color: Color(0xFF90B094), size: 30),
+              const SizedBox(width: 10),
+              const Text(
+                'Shasthobondhu',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
+                  ),
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFF4B4B),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Text(
+                        '12',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              FutureBuilder(
+                future: Supabase.instance.client.auth.currentUser != null
+                    ? Supabase.instance.client
+                        .from('profiles')
+                        .select('avatar_url')
+                        .eq('id', Supabase.instance.client.auth.currentUser!.id)
+                        .maybeSingle()
+                    : Future.value(null),
+                builder: (context, snapshot) {
+                  final data = snapshot.data as Map<String, dynamic>?;
+                  final avatarUrl = data?['avatar_url'] as String?;
+                  return CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Colors.white24,
+                    backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                    child: avatarUrl == null ? const Icon(Icons.person, color: Colors.white) : null,
+                  );
+                },
+              ),
+            ],
+          ),
         ],
       ),
     );
